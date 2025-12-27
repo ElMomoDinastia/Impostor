@@ -1,31 +1,43 @@
-# Use Puppeteer's official image with Chrome pre-installed
+# ============================================
+# Stage 1: Build with all dependencies
+# ============================================
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install ALL dependencies (including devDependencies for TypeScript)
+RUN npm ci
+
+# Copy source and config
+COPY tsconfig.json ./
+COPY src ./src
+
+# Build TypeScript
+RUN npm run build
+
+# ============================================
+# Stage 2: Production with Puppeteer/Chrome
+# ============================================
 FROM ghcr.io/puppeteer/puppeteer:latest
 
 # Switch to root to set up the app
 USER root
 
-# Set working directory
 WORKDIR /app
 
 # Set environment variables for Puppeteer
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
-# Copy package files first (for better caching)
+# Copy package files and install production deps only
 COPY package*.json ./
-
-# Install dependencies (production only to reduce image size)
 RUN npm ci --omit=dev
 
-# Copy source files
-COPY tsconfig.json ./
-
-# We need typescript for build, install it temporarily
-RUN npm install -g typescript
-
-# Copy and build
-COPY src ./src
-RUN tsc
+# Copy built files from builder stage
+COPY --from=builder /app/dist ./dist
 
 # Create logs directory and set ownership
 RUN mkdir -p logs && chown -R pptruser:pptruser /app
