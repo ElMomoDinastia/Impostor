@@ -1,6 +1,9 @@
 # Use Puppeteer's official image with Chrome pre-installed
 FROM ghcr.io/puppeteer/puppeteer:latest
 
+# Switch to root to set up the app
+USER root
+
 # Set working directory
 WORKDIR /app
 
@@ -11,21 +14,24 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 # Copy package files first (for better caching)
 COPY package*.json ./
 
-# Install all dependencies (need devDeps for TypeScript build)
-RUN npm ci
+# Install dependencies (production only to reduce image size)
+RUN npm ci --omit=dev
 
 # Copy source files
 COPY tsconfig.json ./
+
+# We need typescript for build, install it temporarily
+RUN npm install -g typescript
+
+# Copy and build
 COPY src ./src
+RUN tsc
 
-# Build TypeScript
-RUN npm run build
+# Create logs directory and set ownership
+RUN mkdir -p logs && chown -R pptruser:pptruser /app
 
-# Remove dev dependencies to reduce image size
-RUN npm prune --production
-
-# Create logs directory
-RUN mkdir -p logs
+# Switch back to non-root user for security
+USER pptruser
 
 # Environment variables
 ENV NODE_ENV=production
