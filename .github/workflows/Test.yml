@@ -40,9 +40,9 @@ jobs:
 
       - name: Ejecutar Sala #${{ matrix.room_id }}
         env:
-          # Estas variables las lee tu código con process.env
           ROOM_ID: ${{ matrix.room_id }}
           HAXBALL_TOKEN: ${{ secrets[format('TOKEN_{0}', matrix.room_id)] }}
           NODE_ENV: production
+          MONGO_URI: ${{ secrets.MONGO_URI }} 
         run: |
           npm start
