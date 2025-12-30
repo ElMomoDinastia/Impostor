@@ -62,13 +62,14 @@ class HBRoomAdapter {
             await this.page.goto(HAXBALL_HEADLESS_URL, { waitUntil: 'networkidle0', timeout: 30000 });
             await this.page.waitForFunction('typeof HBInit === "function"', { timeout: 30000 });
             logger_1.roomLogger.info('HBInit API is ready');
-            const roomConfig = {
+             const roomConfig = {
                 roomName: this.config.roomName,
                 maxPlayers: this.config.maxPlayers,
                 noPlayer: this.config.noPlayer,
                 token: this.config.token || '',
                 public: this.config.public ?? true,
                 password: this.config.password || null,
+                geo: this.config.geo, // <--- AGREGA ESTA LÍNEA AQUÍ
             };
             logger_1.roomLogger.info({ config: { ...roomConfig, token: '[REDACTED]' } }, 'Creating HaxBall room...');
             const roomLink = await this.page.evaluate(async (config) => {
@@ -121,7 +122,7 @@ class HBRoomAdapter {
             return;
         try {
             const stadiumJson = JSON.stringify({
-                "name": "Mesa Impostor PRO 5P",
+                "name": "Mesa Impostor Teleese",
                 "width": 400,
                 "height": 400,
                 "spawnDistance": 0,
