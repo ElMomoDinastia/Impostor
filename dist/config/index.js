@@ -1,75 +1,58 @@
-import dotenv from 'dotenv';
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.config = void 0;
+exports.getPublicConfig = getPublicConfig;
 
-// Load environment variables from .env file
-dotenv.config();
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
 
-export interface Config {
-  // HaxBall
-  haxballToken: string | undefined;
-  roomName: string;
-  maxPlayers: number;
-  noPlayer: boolean;
-
-  // Server
-  port: number;
-  logLevel: string;
-
-  // Game Timing (in seconds)
-  clueTime: number;
-  discussionTime: number;
-  votingTime: number;
-
-  // Derived
-  isProduction: boolean;
-  hasToken: boolean;
+function getEnvNumber(key, defaultValue) {
+    const value = process.env[key];
+    if (!value) return defaultValue;
+    const parsed = parseInt(value, 10);
+    return isNaN(parsed) ? defaultValue : parsed;
 }
 
-function getEnvNumber(key: string, defaultValue: number): number {
-  const value = process.env[key];
-  if (!value) return defaultValue;
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? defaultValue : parsed;
+function getEnvBoolean(key, defaultValue) {
+    const value = process.env[key];
+    if (!value) return defaultValue;
+    return value.toLowerCase() === 'true';
 }
 
-function getEnvBoolean(key: string, defaultValue: boolean): boolean {
-  const value = process.env[key];
-  if (!value) return defaultValue;
-  return value.toLowerCase() === 'true';
+function loadConfig() {
+    const roomIdRaw = process.env.ROOM_ID || '1';
+    const roomIdFormated = roomIdRaw.padStart(2, '0');
+    const haxballToken = process.env[`TOKEN_${roomIdRaw}`] || process.env.HAXBALL_TOKEN;
+
+    return {
+        haxballToken: haxballToken && haxballToken.trim() !== '' ? haxballToken : undefined,
+        roomName: `🔴  「 𝙄𝙈𝙋𝙊𝙎𝙏𝙊𝙍 」  #${roomIdFormated}`,
+        
+        // --- CAMBIOS SOLICITADOS ---
+        maxPlayers: getEnvNumber('MAX_PLAYERS', 16),
+        noPlayer: false, // Forzamos False para que se vea el Host
+        
+        // --- CONEXIÓN MONGO ---
+        mongoUri: process.env.MONGO_URI, // Le decimos que lea el Secret de GitHub
+        
+        port: getEnvNumber('PORT', 3000),
+        logLevel: process.env.LOG_LEVEL || 'info',
+        clueTime: getEnvNumber('CLUE_TIME', 30),
+        discussionTime: getEnvNumber('DISCUSSION_TIME', 30),
+        votingTime: getEnvNumber('VOTING_TIME', 45),
+        isProduction: process.env.NODE_ENV === 'production',
+        hasToken: !!(haxballToken && haxballToken.trim() !== ''),
+    };
 }
 
-function loadConfig(): Config {
-  const roomIdRaw = process.env.ROOM_ID || '1';
-  const roomIdFormated = roomIdRaw.padStart(2, '0');
-  
-  const haxballToken = process.env[`TOKEN_${roomIdRaw}`] || process.env.HAXBALL_TOKEN;
+exports.config = loadConfig();
 
-  return {
-    haxballToken: haxballToken && haxballToken.trim() !== '' ? haxballToken : undefined,
-    
-    roomName: `🔴  「 𝙄𝙈𝙋𝙊𝙎𝙏𝙊𝙍 」  #${roomIdFormated}`,
-    
-    maxPlayers: getEnvNumber('MAX_PLAYERS', 16),
-    noPlayer: getEnvBoolean('NO_PLAYER', true),
-
-    port: getEnvNumber('PORT', 3000),
-    logLevel: process.env.LOG_LEVEL || 'info',
-
-    clueTime: getEnvNumber('CLUE_TIME', 30),
-    discussionTime: getEnvNumber('DISCUSSION_TIME', 30),
-    votingTime: getEnvNumber('VOTING_TIME', 45),
-
-    // Derived
-    isProduction: process.env.NODE_ENV === 'production',
-    hasToken: !!(haxballToken && haxballToken.trim() !== ''),
-  };
-}
-
-export const config = loadConfig();
-
-// Log config on startup (excluding sensitive data)
-export function getPublicConfig(): Omit<Config, 'haxballToken'> & { haxballToken: string } {
-  return {
-    ...config,
-    haxballToken: config.hasToken ? '[REDACTED]' : '[NOT SET]',
-  };
+function getPublicConfig() {
+    return {
+        ...exports.config,
+        haxballToken: exports.config.hasToken ? '[REDACTED]' : '[NOT SET]',
+    };
 }
