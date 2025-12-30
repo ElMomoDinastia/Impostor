@@ -1,13 +1,19 @@
-name: Deploy HaxBall Bots
+name: Deploy 11 HaxBall Rooms
 
 on:
   push:
-    branches: [ main ] # Se activa al subir cambios a la rama main
-  workflow_dispatch: # Permite activarlo manualmente desde la pestaña Actions
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  deploy-room:
     runs-on: ubuntu-latest
+    strategy:
+      # Si una sala falla por token expirado, las otras 10 siguen funcionando
+      fail-fast: false 
+      matrix:
+        # Esto crea los 11 procesos paralelos
+        room_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
     steps:
       - name: Checkout del código
@@ -22,21 +28,21 @@ jobs:
       - name: Instalar dependencias
         run: |
           npm install
+          # Forzamos la instalación de los plugins de stealth por seguridad
           npm install puppeteer-extra puppeteer-extra-plugin-stealth
 
       - name: Instalar dependencias de Chrome (Linux)
         run: |
           sudo apt-get update
           sudo apt-get install -y libgbm-dev wget gnupg
-          # Esto asegura que Puppeteer tenga todo lo necesario para correr en Ubuntu
+          # Instalamos el binario de Chrome necesario para Puppeteer
           npx puppeteer install
 
-      - name: Ejecutar Servidor de HaxBall
+      - name: Ejecutar Sala #${{ matrix.room_id }}
         env:
-          # Aquí puedes poner tus variables de entorno si las usas
-          # NODE_ENV: production
-          HAXBALL_TOKEN: ${{ secrets.HAXBALL_TOKEN }} 
+          # Estas variables las lee tu código con process.env
+          ROOM_ID: ${{ matrix.room_id }}
+          HAXBALL_TOKEN: ${{ secrets[format('TOKEN_{0}', matrix.room_id)] }}
+          NODE_ENV: production
         run: |
-          # Usamos 'nohup' o un proceso de fondo si quieres que se mantenga
-          # O simplemente ejecutamos el index si el Action es para testeo/deploy
-          node dist/index.js
+          npm start
