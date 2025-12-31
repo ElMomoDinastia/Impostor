@@ -24,9 +24,9 @@ var GamePhase;
 exports.DEFAULT_GAME_SETTINGS = {
     minPlayers: 5,
     maxPlayersPerRound: 5,
-    clueTimeSeconds: 20, // Bajamos de 30 a 20 (es solo una palabra)
+    clueTimeSeconds: 15, // Bajamos de 30 a 20 (es solo una palabra)
     discussionTimeSeconds: 30, // Bajamos de 60 a 30 (habrá varios debates)
-    votingTimeSeconds: 30, // Bajamos de 45 a 30
+    votingTimeSeconds: 20, // Bajamos de 45 a 30
 };
 /**
  * Initial game state factory
