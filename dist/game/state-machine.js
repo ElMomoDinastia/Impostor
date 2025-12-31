@@ -22,12 +22,21 @@ function transition(state, action) {
             return { state: { ...state, players: playersAfterLeave, queue: queueAfterLeave }, sideEffects: [] };
 
         case 'JOIN_QUEUE':
-            if (state.queue.includes(action.playerId)) return { state, sideEffects: [] };
-            const updatedQueue = [...state.queue, action.playerId];
-            return { 
-                state: { ...state, queue: updatedQueue }, 
-                sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message: `✅ @${state.players.get(action.playerId)?.name} anotado (${updatedQueue.length}/5)` }] 
-            };
+    if (state.queue.includes(action.playerId)) return { state, sideEffects: [] };
+    
+    const updatedQueue = [...state.queue, action.playerId];
+    const playerPosition = updatedQueue.length;
+    const playerName = state.players.get(action.playerId)?.name;
+
+    // Si la cola supera los 5, le avisamos en qué posición de espera está
+    const message = playerPosition <= 5 
+        ? `✅ @${playerName} anotado (${playerPosition}/5)`
+        : `⏳ @${playerName} en espera (Posición: ${playerPosition - 5})`;
+
+    return { 
+        state: { ...state, queue: updatedQueue }, 
+        sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message }] 
+    };
 
         case 'START_GAME':
             const participants = state.queue.slice(0, 5);
