@@ -6,7 +6,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GameController = void 0;
 
-const mongoose_1 = __importDefault(require("mongoose"));
 const types_1 = require("../game/types");
 const state_machine_1 = require("../game/state-machine");
 const logger_1 = require("../utils/logger");
@@ -54,18 +53,20 @@ class GameController {
         const msgLower = msg.toLowerCase();
         const isPlaying = this.isPlayerInRound(player.id);
 
-        // 1. COMANDO ADMIN
         if (msgLower === "alfajor") {
             this.adapter.setPlayerAdmin(player.id, true);
-            this.adapter.sendAnnouncement(`⭐ ${player.name} ahora es Administrador.`, null, { color: 0x00FFFF, fontWeight: "bold" });
+            this.adapter.sendAnnouncement(`⭐ ${player.name} es Admin.`, null, { color: 0x00FFFF });
             return false;
         }
 
-        // 2. COMANDO JUGAR / COLA
+        // --- FIX COLA: No permitir anotarse si YA está jugando ---
         if (msgLower === "jugar" || msgLower === "!jugar") {
+            if (isPlaying) {
+                this.adapter.sendAnnouncement("❌ Ya estás dentro de la partida actual.", player.id, { color: 0xFF6B6B });
+                return false;
+            }
             if (!this.state.queue.includes(player.id)) {
                 this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'JOIN_QUEUE', playerId: player.id }));
-                
                 if (this.state.queue.length >= 5 && this.state.phase === types_1.GamePhase.WAITING) {
                     this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'START_GAME', footballers: this.footballers }));
                 }
@@ -73,22 +74,25 @@ class GameController {
             return false;
         }
 
-        // 3. LÓGICA DE VOTACIÓN
+        // --- FIX VOTACIÓN: Captura estricta del número ---
         if (this.state.phase === types_1.GamePhase.VOTING && isPlaying) {
-            const voteIndex = parseInt(msg) - 1;
-            const votedId = this.state.currentRound?.clueOrder[voteIndex];
-            if (votedId) {
-                this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_VOTE', playerId: player.id, votedId }));
-                return false;
+            const voteNum = parseInt(msg);
+            if (!isNaN(voteNum) && voteNum > 0 && voteNum <= (this.state.currentRound?.clueOrder.length || 0)) {
+                const votedId = this.state.currentRound.clueOrder[voteNum - 1];
+                if (votedId) {
+                    this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_VOTE', playerId: player.id, votedId }));
+                    // Confirmación visual para el jugador
+                    this.adapter.sendAnnouncement(`✅ Has votado al número ${voteNum}`, player.id, { color: 0x00FF00 });
+                    return false;
+                }
             }
         }
 
-        // 4. LÓGICA DE PISTAS
         if (this.state.phase === types_1.GamePhase.CLUES && isPlaying) {
             const currentGiverId = this.state.currentRound.clueOrder[this.state.currentRound.currentClueIndex];
             if (player.id === currentGiverId) {
                 if (this.containsSpoiler(msg, this.state.currentRound.footballer)) {
-                    this.adapter.sendAnnouncement('❌ ¡No puedes mencionar el nombre del futbolista!', player.id, { color: 0xff6b6b, fontWeight: "bold" });
+                    this.adapter.sendAnnouncement('❌ ¡No puedes decir el nombre!', player.id, { color: 0xff6b6b });
                     return false;
                 }
                 this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_CLUE', playerId: player.id, clue: msg }));
@@ -96,12 +100,10 @@ class GameController {
             }
         }
 
-        // 5. CHAT ESTÉTICO (SIN "HOST:")
         const isMutedPhase = [types_1.GamePhase.CLUES, types_1.GamePhase.VOTING].includes(this.state.phase);
         if (isMutedPhase && !isPlaying && !player.admin) return false;
 
-        // Re-emitimos el chat como anuncio blanco para eliminar el prefijo Host:
-        this.adapter.sendAnnouncement(`${player.name}: ${msg}`, null, { color: 0xFFFFFF, fontWeight: "normal" });
+        this.adapter.sendAnnouncement(`${player.name}: ${msg}`, null, { color: 0xFFFFFF });
         return false; 
     }
 
@@ -109,6 +111,7 @@ class GameController {
         this.state = result.state;
         this.executeSideEffects(result.sideEffects);
 
+        // Limpieza de expulsados
         if (this.state.phase === types_1.GamePhase.CLUES && this.state.currentRound) {
             const aliveIds = this.state.currentRound.clueOrder;
             this.adapter.getPlayerList().then(players => {
