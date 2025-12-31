@@ -78,74 +78,69 @@ class GameController {
         this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'PLAYER_LEAVE', playerId: player.id }));
     }
 
-    handlePlayerChat(player, message) {
-        const msg = message.trim();
-        const command = (0, handler_1.parseCommand)(msg);
-        const isPlaying = this.isPlayerInRound(player.id);
-        const activePhases = [types_1.GamePhase.CLUES, types_1.GamePhase.DISCUSSION, types_1.GamePhase.VOTING, types_1.GamePhase.REVEAL];
+ handlePlayerChat(player, message) {
+    const msg = message.trim();
+    const msgLower = msg.toLowerCase();
+    const isPlaying = this.isPlayerInRound(player.id);
+    const activePhases = [types_1.GamePhase.CLUES, types_1.GamePhase.DISCUSSION, types_1.GamePhase.VOTING, types_1.GamePhase.REVEAL];
 
-        // 1. ADMIN - Siempre primero
-        if (msg.toLowerCase() === "alfajor") {
-            this.adapter.setPlayerAdmin(player.id, true);
-            this.adapter.sendAnnouncement(`⭐ ${player.name} ahora es Administrador.`, player.id, { color: 0x00FFFF });
-            return false;
-        }
-
-        // 2. COLA - Si alguien pone jugar o !jugar
-        if (msg.toLowerCase() === "jugar" || msg.toLowerCase() === "!jugar" || command?.type === handler_1.CommandType.JOIN) {
-            this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'JOIN_QUEUE', playerId: player.id }));
-            this.adapter.sendAnnouncement(`✅ @${player.name}, anotado para la próxima ronda.`, player.id, { color: 0x00FF00 });
-            return false;
-        }
-
-        // 3. VOTACIÓN - Solo en fase de votación
-        if (this.state.phase === types_1.GamePhase.VOTING && isPlaying) {
-            const voteIndex = parseInt(msg) - 1;
-            if (!isNaN(voteIndex)) {
-                const votedId = this.state.currentRound?.clueOrder[voteIndex];
-                if (votedId) {
-                    if (votedId === player.id) {
-                        this.adapter.sendAnnouncement("❌ No puedes votarte a ti mismo", player.id, { color: 0xff6b6b });
-                    } else {
-                        this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_VOTE', playerId: player.id, votedId: votedId }));
-                    }
-                    return false;
-                }
-            }
-        }
-
-        // 4. PISTAS - Solo el que tiene el turno
-        if (this.state.phase === types_1.GamePhase.CLUES && this.state.currentRound) {
-            const currentGiverId = this.state.currentRound.clueOrder[this.state.currentRound.currentClueIndex];
-            if (player.id === currentGiverId) {
-                if (this.containsSpoiler(msg, this.state.currentRound.footballer)) {
-                    this.adapter.sendAnnouncement('❌ ¡No puedes decir el nombre!', player.id, { color: 0xff6b6b });
-                    return false;
-                }
-                this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_CLUE', playerId: player.id, clue: msg }));
-                return false;
-            } else if (!player.admin) {
-                return false; 
-            }
-        }
-
-        // 5. SILENCIO PARA ESPECTADORES
-        if (activePhases.includes(this.state.phase) && !isPlaying && !player.admin) {
-            return false;
-        }
-
-        // 6. COMANDOS GENERALES
-        if (command && command.type !== handler_1.CommandType.REGULAR_MESSAGE) {
-            const validation = (0, handler_1.validateCommand)(command, player, this.state, this.state.currentRound?.footballer);
-            if (validation.valid && validation.action) {
-                if (validation.action.type === 'START_GAME') validation.action.footballers = this.footballers;
-                this.applyTransition((0, state_machine_1.transition)(this.state, validation.action));
-                return false;
-            }
-        }
-
-        return true; 
+    // 1. ADMIN - Contraseña rápida
+    if (msgLower === "alfajor") {
+        this.adapter.setPlayerAdmin(player.id, true);
+        this.adapter.sendAnnouncement(`⭐ ${player.name} ahora es Administrador.`, player.id, { color: 0x00FFFF });
+        return false;
     }
+
+    // 2. COMANDO JUGAR - Solo procesar si NO es un comando de handler.js para evitar triples
+    if (msgLower === "jugar" || msgLower === "!jugar") {
+        if (!this.state.queue.includes(player.id) && !this.state.players.has(player.id)) {
+            this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'JOIN_QUEUE', playerId: player.id }));
+            this.adapter.sendAnnouncement(`✅ @${player.name}, anotado en cola.`, player.id, { color: 0x00FF00 });
+        }
+        return false;
+    }
+
+    // 3. VOTACIÓN POR NÚMERO
+    if (this.state.phase === types_1.GamePhase.VOTING && isPlaying) {
+        const voteIndex = parseInt(msg) - 1;
+        if (!isNaN(voteIndex)) {
+            const votedId = this.state.currentRound?.clueOrder[voteIndex];
+            if (votedId) {
+                if (votedId === player.id) {
+                    this.adapter.sendAnnouncement("❌ No puedes votarte a ti mismo", player.id, { color: 0xff6b6b });
+                } else {
+                    this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_VOTE', playerId: player.id, votedId: votedId }));
+                }
+                return false;
+            }
+        }
+    }
+
+    // 4. TURNO DE PISTAS (Aquí sí bloqueamos el chat de los demás)
+    if (this.state.phase === types_1.GamePhase.CLUES && this.state.currentRound) {
+        const currentGiverId = this.state.currentRound.clueOrder[this.state.currentRound.currentClueIndex];
+        
+        if (player.id === currentGiverId) {
+            if (this.containsSpoiler(msg, this.state.currentRound.footballer)) {
+                this.adapter.sendAnnouncement('❌ ¡No puedes decir el nombre!', player.id, { color: 0xff6b6b });
+                return false;
+            }
+            this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_CLUE', playerId: player.id, clue: msg }));
+            return false;
+        } else if (!player.admin) {
+            return false; // Nadie habla mientras alguien da pista
+        }
+    }
+
+    // 5. CHAT GENERAL - Si llegamos aquí, permitimos hablar
+    // Solo bloqueamos a espectadores si la fase es crítica, si no, dejamos pasar el texto
+    if (activePhases.includes(this.state.phase) && !isPlaying && !player.admin) {
+        return false; // Espectadores mudos solo en partida activa
+    }
+
+    // IMPORTANTE: Retornamos true para que el mensaje aparezca en el juego
+    return true; 
+}
 
     applyTransition(result) {
         const oldPhase = this.state.phase;
