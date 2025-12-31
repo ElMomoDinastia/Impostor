@@ -9,42 +9,6 @@ exports.GameController = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const types_1 = require("../game/types");
 const state_machine_1 = require("../game/state-machine");
-const handler_1 = require("../commands/handler");
-const logger_1 = require("../utils/logger");
-const config_1 = require("../config");
-const footballers_json_1 = __importDefault(require("../data/footballers.json"));
-
-// --- MODELO DE JUGADOR ---
-const playerSchema = new mongoose_1.default.Schema({
-    name: String,
-    auth: String,
-    conn: String,
-    room: String,
-    date: { type: Date, default: Date.now }
-});
-const PlayerDB = mongoose_1.default.models.Player || mongoose_1.default.model('Player', playerSchema, 'playerlogs');
-
-const SEAT_POSITIONS = [
-    { x: 0, y: -130 }, { x: 124, y: -40 }, { x: 76, y: 105 }, { x: -76, y: 105 }, { x: -124, y: -40 },
-];
-
-class GameController {
-    adapter;
-    state;
-    footballers;
-    phaseTimer = null;
-    assignDelayTimer = null;
-"use strict";
-
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.GameController = void 0;
-
-const mongoose_1 = __importDefault(require("mongoose"));
-const types_1 = require("../game/types");
-const state_machine_1 = require("../game/state-machine");
 const logger_1 = require("../utils/logger");
 const config_1 = require("../config");
 const footballers_json_1 = __importDefault(require("../data/footballers.json"));
@@ -100,14 +64,12 @@ class GameController {
         const msgLower = msg.toLowerCase();
         const isPlaying = this.isPlayerInRound(player.id);
 
-        // 1. ADMIN QUICK PASS
         if (msgLower === "alfajor") {
             this.adapter.setPlayerAdmin(player.id, true);
             this.adapter.sendAnnouncement(`⭐ ${player.name} es Admin.`, null, { color: 0x00FFFF });
             return false;
         }
 
-        // 2. COMANDO JUGAR (FIX: Eliminada la restricción que impedía unirse)
         if (msgLower === "jugar" || msgLower === "!jugar") {
             if (!this.state.queue.includes(player.id)) {
                 this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'JOIN_QUEUE', playerId: player.id }));
@@ -115,7 +77,6 @@ class GameController {
             return false;
         }
 
-        // 3. VOTACIÓN
         if (this.state.phase === types_1.GamePhase.VOTING && isPlaying) {
             const voteIndex = parseInt(msg) - 1;
             if (!isNaN(voteIndex)) {
@@ -127,7 +88,6 @@ class GameController {
             }
         }
 
-        // 4. PISTAS Y FILTRO DE SPOILERS
         if (this.state.phase === types_1.GamePhase.CLUES && this.state.currentRound) {
             const currentGiverId = this.state.currentRound.clueOrder[this.state.currentRound.currentClueIndex];
             if (player.id === currentGiverId) {
@@ -140,7 +100,6 @@ class GameController {
             } else if (!player.admin) return false; 
         }
 
-        // 5. CHAT GENERAL (FIX: Re-emisión para evitar el silencio total)
         const isMutedPhase = [types_1.GamePhase.CLUES, types_1.GamePhase.VOTING].includes(this.state.phase);
         if (isMutedPhase && !isPlaying && !player.admin) return false;
 
@@ -152,7 +111,19 @@ class GameController {
         this.state = result.state;
         this.executeSideEffects(result.sideEffects);
 
-        // Gestión de Autoflujo de fases
+        // --- LÓGICA DE SUPERVIVENCIA: LIMPIEZA DE EQUIPOS ---
+        if (this.state.phase === types_1.GamePhase.CLUES && this.state.currentRound) {
+            const aliveIds = this.state.currentRound.clueOrder;
+            this.adapter.getPlayerList().then(players => {
+                players.forEach(p => {
+                    // Si el jugador está en el campo pero ya no está en la ronda (fue expulsado)
+                    if (p.id !== 0 && p.team !== 0 && !aliveIds.includes(p.id)) {
+                        this.adapter.setPlayerTeam(p.id, 0); 
+                    }
+                });
+            });
+        }
+
         if (this.state.phase === types_1.GamePhase.ASSIGN && !this.assignDelayTimer) {
             this.setupGameField();
             this.assignDelayTimer = setTimeout(() => {
@@ -197,7 +168,7 @@ class GameController {
                 case 'SET_PHASE_TIMER': this.setPhaseTimer(e.durationSeconds); break;
                 case 'CLEAR_TIMER': this.clearPhaseTimer(); break;
                 case 'AUTO_START_GAME': 
-                    if (this.state.queue.length >= 5) {
+                    if (this.state.queue.length >= 5 && this.state.phase === types_1.GamePhase.WAITING) {
                         this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'START_GAME', footballers: this.footballers }));
                     }
                     break;
