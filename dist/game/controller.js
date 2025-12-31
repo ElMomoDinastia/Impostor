@@ -81,38 +81,57 @@ class GameController {
     handlePlayerChat(player, message) {
         const command = (0, handler_1.parseCommand)(message);
         const isAdmin = player.admin;
-
-        // Si hay partida en curso y el jugador NO está jugando (es espectador o está en cola)
         const isPlaying = this.isPlayerInRound(player.id);
         const activePhases = [types_1.GamePhase.CLUES, types_1.GamePhase.DISCUSSION, types_1.GamePhase.VOTING, types_1.GamePhase.REVEAL];
 
+        // --- BLOQUE DE VOTACIÓN POR NÚMERO ---
+        if (this.state.phase === types_1.GamePhase.VOTING && isPlaying) {
+            const voteIndex = parseInt(message.trim()) - 1;
+            if (!isNaN(voteIndex) && this.state.currentRound) {
+                const votedId = this.state.currentRound.clueOrder[voteIndex];
+                if (votedId) {
+                    if (votedId === player.id) {
+                        this.adapter.sendAnnouncement("❌ No puedes votarte a ti mismo", player.id, { color: 0xff6b6b });
+                    } else {
+                        this.applyTransition((0, state_machine_1.transition)(this.state, { 
+                            type: 'SUBMIT_VOTE', 
+                            playerId: player.id, 
+                            votedId: votedId 
+                        }));
+                    }
+                    return false;
+                }
+            }
+        }
+
+        // --- GESTIÓN DE ESPECTADORES Y COLA ---
         if (activePhases.includes(this.state.phase)) {
-            // Permitir comando !jugar aunque no esté en la ronda
             if (command?.type === handler_1.CommandType.JOIN) {
                 this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'JOIN_QUEUE', playerId: player.id }));
                 return false;
             }
-            // Si no está jugando y no es admin, silenciar chat
             if (!isPlaying && !isAdmin) return false;
         }
 
-        // Fase de Pistas: Solo el que tiene el turno puede hablar
+        // --- FASE DE PISTAS ---
         if (this.state.phase === types_1.GamePhase.CLUES && this.state.currentRound) {
             const currentGiverId = this.state.currentRound.clueOrder[this.state.currentRound.currentClueIndex];
-            if (player.id !== currentGiverId && !isAdmin) return false;
-
-            const clueWord = message.trim().split(/\s+/)[0];
-            if (clueWord) {
-                if (this.containsSpoiler(clueWord, this.state.currentRound.footballer)) {
-                    this.adapter.sendAnnouncement('❌ ¡No puedes decir el nombre del futbolista!', player.id, { color: 0xff6b6b });
+            if (player.id === currentGiverId) {
+                const clueWord = message.trim().split(/\s+/)[0];
+                if (clueWord && !command) {
+                    if (this.containsSpoiler(clueWord, this.state.currentRound.footballer)) {
+                        this.adapter.sendAnnouncement('❌ ¡No puedes decir el nombre!', player.id, { color: 0xff6b6b });
+                        return false;
+                    }
+                    this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_CLUE', playerId: player.id, clue: clueWord }));
                     return false;
                 }
-                this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_CLUE', playerId: player.id, clue: clueWord }));
-                return false;
+            } else if (!isAdmin) {
+                return false; 
             }
         }
 
-        // Procesar Comandos Restantes
+        // --- PROCESAR COMANDOS ---
         if (command && command.type !== handler_1.CommandType.REGULAR_MESSAGE) {
             const validation = (0, handler_1.validateCommand)(command, player, this.state, this.state.currentRound?.footballer);
             if (validation.valid && validation.action) {
@@ -129,30 +148,27 @@ class GameController {
     }
 
     applyTransition(result) {
+        const oldPhase = this.state.phase;
         this.state = result.state;
         this.executeSideEffects(result.sideEffects);
-        
-        // --- LÓGICA DE AUTO-START DESDE LOBBY ---
+
+        // Si volvemos a fase de pistas desde votación (ronda nueva tras fallo)
+        if (oldPhase === types_1.GamePhase.VOTING && this.state.phase === types_1.GamePhase.CLUES) {
+            this.setupGameField(); 
+        }
+
         if (this.state.phase === types_1.GamePhase.WAITING) {
-            // Si ya hay gente suficiente esperando en la cola
             if (this.state.queue.length >= 5) {
                 if (this.assignDelayTimer) clearTimeout(this.assignDelayTimer);
-
                 this.adapter.sendAnnouncement(`📢 ¡Cola llena! Iniciando nueva ronda en 3s...`, null, { color: 0x00FF00, fontWeight: 'bold' });
-                
                 this.assignDelayTimer = setTimeout(() => {
-                    // Verificamos que sigamos en WAITING antes de forzar el inicio
                     if (this.state.phase === types_1.GamePhase.WAITING) {
-                        this.applyTransition((0, state_machine_1.transition)(this.state, { 
-                            type: 'START_GAME', 
-                            footballers: this.footballers 
-                        }));
+                        this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'START_GAME', footballers: this.footballers }));
                     }
                 }, 3000);
             }
         }
 
-        // --- TRANSICIONES AUTOMÁTICAS ---
         if (this.state.phase === types_1.GamePhase.ASSIGN) {
             this.setupGameField();
             this.assignDelayTimer = setTimeout(() => {
@@ -165,7 +181,6 @@ class GameController {
         }
 
         if (this.state.phase === types_1.GamePhase.RESULTS) {
-            // Esperamos 8 segundos para que vean los resultados y volvemos al Lobby (WAITING)
             setTimeout(() => {
                 this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'RESET_GAME' }));
             }, 8000);
@@ -174,7 +189,7 @@ class GameController {
 
     async setupGameField() {
         if (!this.state.currentRound) return;
-        const roundIds = this.state.currentRound.clueOrder; // Usamos clueOrder que ya tiene a todos
+        const roundIds = this.state.currentRound.clueOrder;
         try {
             await this.adapter.stopGame();
             const players = await this.adapter.getPlayerList();
@@ -204,7 +219,6 @@ class GameController {
                 case 'SET_PHASE_TIMER': this.setPhaseTimer(e.durationSeconds); break;
                 case 'CLEAR_TIMER': this.clearPhaseTimer(); break;
                 case 'AUTO_START_GAME': 
-                    // Si el estado nos pide auto-start, lo hacemos rápido
                     setTimeout(() => this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'START_GAME', footballers: this.footballers })), 1500);
                     break;
             }
