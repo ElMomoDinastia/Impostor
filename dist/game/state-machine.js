@@ -437,5 +437,4 @@ function getPhaseDescription(phase) {
     };
     return names[phase] ?? 'Desconocido';
 }
-}
 //# sourceMappingURL=state-machine.js.map
