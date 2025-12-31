@@ -1,7 +1,10 @@
 "use strict";
+/**
+ * Game Types for HaxBall Impostor Game
+ */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createInitialState = exports.DEFAULT_GAME_SETTINGS = exports.GamePhase = void 0;
-
+exports.DEFAULT_GAME_SETTINGS = exports.GamePhase = void 0;
+exports.createInitialState = createInitialState;
 /**
  * Game phases following the state machine pattern
  */
@@ -14,19 +17,17 @@ var GamePhase;
     GamePhase["VOTING"] = "VOTING";
     GamePhase["REVEAL"] = "REVEAL";
     GamePhase["RESULTS"] = "RESULTS";
-})(GamePhase = exports.GamePhase || (exports.GamePhase = {}));
-
+})(GamePhase || (exports.GamePhase = GamePhase = {}));
 /**
  * Default game settings
  */
 exports.DEFAULT_GAME_SETTINGS = {
     minPlayers: 5,
     maxPlayersPerRound: 5,
-    clueTimeSeconds: 20,         // Bajamos de 30 a 20
-    discussionTimeSeconds: 30,   // Bajamos de 60 a 30
-    votingTimeSeconds: 30,       // Bajamos de 45 a 30
+    clueTimeSeconds: 20, // Bajamos de 30 a 20 (es solo una palabra)
+    discussionTimeSeconds: 30, // Bajamos de 60 a 30 (habrá varios debates)
+    votingTimeSeconds: 30, // Bajamos de 45 a 30
 };
-
 /**
  * Initial game state factory
  */
@@ -37,7 +38,7 @@ function createInitialState(settings) {
         queue: [],
         currentRound: null,
         roundHistory: [],
-        settings: Object.assign(Object.assign({}, exports.DEFAULT_GAME_SETTINGS), settings),
+        settings: { ...exports.DEFAULT_GAME_SETTINGS, ...settings },
     };
 }
-exports.createInitialState = createInitialState;
+//# sourceMappingURL=types.js.map
