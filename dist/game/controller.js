@@ -77,74 +77,71 @@ class GameController {
     handlePlayerChat(player, message) {
         const msg = message.trim();
         const msgLower = msg.toLowerCase();
+        const phase = this.state.phase;
         const round = this.state.currentRound;
 
-        // 1. COMANDOS ADMIN
+        // 1. COMANDOS DE ADMIN (Siempre funcionan)
         if (msgLower === "!limpiar" && player.admin) {
             this.state.queue = [];
-            this.adapter.sendAnnouncement("🧹 Cola vaciada por el Admin.", null, { color: 0xFFFF00 });
+            this.adapter.sendAnnouncement("🧹 Cola vaciada por Admin.", null, { color: 0xFFFF00 });
             return false;
         }
 
-        // 2. VERIFICACIÓN DE JUGADOR ACTIVO
-        // (Solo importa si hay una ronda iniciada)
+        // 2. PROCESAR COMANDOS DE JUEGO (jugar, salir, etc.)
+        const command = (0, handler_1.parseCommand)(message);
+        if (command.type !== "REGULAR_MESSAGE") {
+            const validation = (0, handler_1.validateCommand)(command, player, this.state, round?.footballer);
+            if (validation.valid && validation.action) {
+                this.applyTransition((0, state_machine_1.transition)(this.state, validation.action));
+            } else if (!validation.valid) {
+                this.adapter.sendAnnouncement(`❌ ${validation.error}`, player.id, { color: 0xff6b6b });
+            }
+            return false; // Los comandos nunca se muestran en el chat
+        }
+
+        // 3. LÓGICA DE CHAT SEGÚN LA FASE
+        
+        // Si no hay partida iniciada o estamos en resultados, CHAT LIBRE
+        if (phase === "WAITING" || phase === "RESULTS") {
+            return true;
+        }
+
         const isPlaying = round && (round.impostorId === player.id || round.normalPlayerIds.includes(player.id));
 
-        // --- FASE DE PISTAS ---
-        if (this.state.phase === "CLUES" && round) {
+        // Fase de Pistas: Solo el que da la pista puede escribir
+        if (phase === "CLUES" && round) {
             const currentGiverId = round.clueOrder[round.currentClueIndex];
             if (player.id === currentGiverId) {
                 const clueWord = msg.split(/\s+/)[0];
                 if (clueWord && !this.containsSpoiler(clueWord, round.footballer)) {
                     this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_CLUE', playerId: player.id, clue: clueWord }));
-                    return false;
                 } else {
-                    this.adapter.sendAnnouncement("❌ ¡No puedes decir el nombre del futbolista!", player.id, { color: 0xFF0000 });
-                    return false;
+                    this.adapter.sendAnnouncement("❌ No puedes spoilear el nombre.", player.id, { color: 0xFF0000 });
                 }
-            } else {
-                this.adapter.sendAnnouncement("🤫 Shhh... Espera tu turno para la pista.", player.id, { color: 0xAAAAAA });
-                return false;
             }
+            return false; // Silencio para todos los demás
         }
 
-        // --- FASE DE DEBATE ---
-        if (this.state.phase === "DISCUSSION") {
+        // Fase de Debate: SOLO JUGADORES ACTIVOS
+        if (phase === "DISCUSSION") {
             if (isPlaying) {
-                return true; // Solo los vivos hablan al chat global
+                return true; // ESTO PERMITE QUE EL MENSAJE SE VEA
             } else {
-                this.adapter.sendAnnouncement("🙊 Solo los jugadores activos pueden hablar en el debate.", player.id, { color: 0xAAAAAA });
+                this.adapter.sendAnnouncement("🙊 Solo los jugadores activos debaten.", player.id, { color: 0xAAAAAA });
                 return false;
             }
         }
 
-        // --- FASE DE VOTACIÓN ---
-        if (this.state.phase === "VOTING") {
+        // Fase de Votación: Solo procesar números
+        if (phase === "VOTING") {
             const votedId = parseInt(msg);
-            if (!isNaN(votedId)) {
-                if (isPlaying) {
-                    this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_VOTE', playerId: player.id, votedId: votedId }));
-                } else {
-                    this.adapter.sendAnnouncement("🚫 No puedes votar si no estás jugando.", player.id, { color: 0xAAAAAA });
-                }
-                return false;
+            if (!isNaN(votedId) && isPlaying) {
+                this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_VOTE', playerId: player.id, votedId: votedId }));
             }
+            return false; // No mostrar votos o chat ajeno en la lista
         }
 
-        // --- COMANDOS GENERALES Y CHAT DE ESPERA ---
-        const command = (0, handler_1.parseCommand)(message);
-        const validation = (0, handler_1.validateCommand)(command, player, this.state, round?.footballer);
-        
-        if (validation.valid && validation.action) {
-            this.applyTransition((0, state_machine_1.transition)(this.state, validation.action));
-            return false;
-        } else if (!validation.valid && command.type !== "REGULAR_MESSAGE") {
-            this.adapter.sendAnnouncement(`❌ ${validation.error}`, player.id, { color: 0xff6b6b });
-            return false;
-        }
-
-        // Dejar hablar en el Lobby (Waiting) o al final de la ronda (Results)
-        return this.state.phase === "WAITING" || this.state.phase === "RESULTS";
+        return false;
     }
 
     applyTransition(result) {
@@ -185,9 +182,6 @@ class GameController {
                     const actualInRoom = this.state.queue.filter(id => this.state.players.has(id));
                     if (actualInRoom.length >= 5) {
                         this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'START_GAME', footballers: this.footballers }));
-                    } else {
-                        this.state.queue = actualInRoom;
-                        this.adapter.sendAnnouncement("⚠️ Falta gente para iniciar.", null, {color: 0xFFCC00});
                     }
                     break;
             }
