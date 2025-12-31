@@ -32,7 +32,7 @@ function loadConfig() {
         roomName: `🔴  「 𝙄𝙈𝙋𝙊𝙎𝙏𝙊𝙍 」  #${roomIdFormated}`,
         
         // --- CAMBIOS SOLICITADOS ---
-        maxPlayers: getEnvNumber('MAX_PLAYERS', 16),
+        maxPlayers: getEnvNumber('MAX_PLAYERS', 15),
         noPlayer: false, // Forzamos False para que se vea el Host
         
         // --- CONEXIÓN MONGO ---
@@ -40,9 +40,9 @@ function loadConfig() {
         
         port: getEnvNumber('PORT', 3000),
         logLevel: process.env.LOG_LEVEL || 'info',
-        clueTime: getEnvNumber('CLUE_TIME', 30),
+        clueTime: getEnvNumber('CLUE_TIME', 15),
         discussionTime: getEnvNumber('DISCUSSION_TIME', 30),
-        votingTime: getEnvNumber('VOTING_TIME', 45),
+        votingTime: getEnvNumber('VOTING_TIME', 20),
         isProduction: process.env.NODE_ENV === 'production',
         hasToken: !!(haxballToken && haxballToken.trim() !== ''),
     };
