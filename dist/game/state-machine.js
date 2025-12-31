@@ -23,19 +23,13 @@ function transition(state, action) {
 
         case 'JOIN_QUEUE':
             if (state.queue.includes(action.playerId)) return { state, sideEffects: [] };
-            
             const updatedQueue = [...state.queue, action.playerId];
             const playerPosition = updatedQueue.length;
             const playerName = state.players.get(action.playerId)?.name || "Jugador";
-
             const message = playerPosition <= 5 
                 ? `✅ @${playerName} anotado (${playerPosition}/5)`
                 : `⏳ @${playerName} en espera (Posición: ${playerPosition - 5})`;
-
-            return { 
-                state: { ...state, queue: updatedQueue }, 
-                sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message }] 
-            };
+            return { state: { ...state, queue: updatedQueue }, sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message }] };
 
         case 'START_GAME':
             const participants = state.queue.slice(0, 5);
@@ -53,6 +47,7 @@ function transition(state, action) {
                 const msg = id === impostorId ? '🕵️ ERES EL IMPOSTOR. Disimula.' : `⚽ EL JUGADOR ES: ${footballer}`;
                 effects.push({ type: 'ANNOUNCE_PRIVATE', playerId: id, message: msg });
             });
+            // Limpiamos la cola de los que ya entraron
             return { state: { ...state, phase: types_1.GamePhase.ASSIGN, currentRound: round, queue: state.queue.slice(5) }, sideEffects: effects };
 
         case 'SUBMIT_CLUE':
@@ -80,6 +75,7 @@ function transition(state, action) {
             };
 
         case 'END_DISCUSSION':
+            if (!state.currentRound) return { state, sideEffects: [] };
             const list = state.currentRound.clueOrder.map((id, i) => `${i + 1}. ${state.players.get(id)?.name || "Desconectado"}`).join(' | ');
             return { 
                 state: { ...state, phase: types_1.GamePhase.VOTING }, 
@@ -91,13 +87,23 @@ function transition(state, action) {
 
         case 'SUBMIT_VOTE':
             const rVote = state.currentRound;
+            if (!rVote) return { state, sideEffects: [] };
             const newVotes = new Map(rVote.votes).set(action.playerId, action.votedId);
             if (newVotes.size >= rVote.clueOrder.length) return handleEndVoting({ ...state, currentRound: { ...rVote, votes: newVotes } });
             return { state: { ...state, currentRound: { ...rVote, votes: newVotes } }, sideEffects: [] };
 
         case 'END_VOTING': return handleEndVoting(state);
         case 'END_REVEAL': return { state: { ...state, phase: types_1.GamePhase.RESULTS }, sideEffects: [] };
-        case 'RESET_GAME': return { state: { ...state, phase: types_1.GamePhase.WAITING, currentRound: null }, sideEffects: [{ type: 'AUTO_START_GAME' }] };
+        
+        case 'RESET_GAME': 
+            return { 
+                state: { ...state, phase: types_1.GamePhase.WAITING, currentRound: null }, 
+                sideEffects: [
+                    { type: 'CLEAR_TIMER' },
+                    { type: 'AUTO_START_GAME' } 
+                ] 
+            };
+            
         default: return { state, sideEffects: [] };
     }
 }
@@ -106,7 +112,6 @@ function handleEndVoting(state) {
     const round = state.currentRound;
     if (!round) return { state, sideEffects: [] };
 
-    // FIX 1: Si nadie votó, se repite la ronda de pistas
     if (round.votes.size === 0) {
         return {
             state: { ...state, phase: types_1.GamePhase.CLUES, currentRound: { ...round, currentClueIndex: 0, votes: new Map() } },
@@ -120,8 +125,6 @@ function handleEndVoting(state) {
     const counts = {};
     round.votes.forEach(v => counts[v] = (counts[v] || 0) + 1);
     const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    
-    // FIX 2: Asegurar ID numérico para buscar en el mapa
     const votedOutId = parseInt(sorted[0]); 
     const isImpostor = votedOutId === round.impostorId;
     const votedName = state.players.get(votedOutId)?.name || "Alguien";
@@ -131,7 +134,7 @@ function handleEndVoting(state) {
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
             sideEffects: [
                 { type: 'CLEAR_TIMER' },
-                { type: 'ANNOUNCE_PUBLIC', message: `🎯 ¡LO CAZARON! ${votedName} era el Impostor.` }
+                { type: 'ANNOUNCE_PUBLIC', message: `🎯 ¡LO CAZARON! ${votedName} era el Impostor.`, style: { color: 0x00FF00 } }
             ] 
         };
     } 
@@ -144,17 +147,16 @@ function handleEndVoting(state) {
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
             sideEffects: [
                 { type: 'CLEAR_TIMER' },
-                { type: 'ANNOUNCE_PUBLIC', message: `💀 ${votedName} era INOCENTE. ¡Gana ${impName} por mayoría!` }
+                { type: 'ANNOUNCE_PUBLIC', message: `💀 ${votedName} era INOCENTE. ¡Gana ${impName} por mayoría!`, style: { color: 0xFF0000 } }
             ] 
         };
     }
 
-    // FIX 3: Resetear turnos correctamente para la siguiente ronda
     const nextRound = {
         ...round,
         normalPlayerIds: remainingInnocents,
         clueOrder: round.clueOrder.filter(id => id !== votedOutId),
-        currentClueIndex: 0, // Volvemos al principio de la lista de sobrevivientes
+        currentClueIndex: 0,
         clues: new Map(),
         votes: new Map()
     };
@@ -171,7 +173,7 @@ function handleEndVoting(state) {
 }
 
 function transitionToClues(state) {
-    if (!state.currentRound) return { state };
+    if (!state.currentRound || !state.currentRound.clueOrder.length) return { state };
     const firstId = state.currentRound.clueOrder[0];
     const first = state.players.get(firstId);
     return { 
