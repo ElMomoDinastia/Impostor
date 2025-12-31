@@ -89,23 +89,18 @@ class GameController {
     );
   }
 
-  // ======================
-  // CHAT
-  // ======================
   handlePlayerChat(player, message) {
     const msg = message.trim();
     const msgLower = msg.toLowerCase();
     const phase = this.state.phase;
     const round = this.state.currentRound;
 
-    // 1️⃣ ADMIN
     if (msgLower === "!limpiar" && player.admin) {
       this.state.queue = [];
       this.adapter.sendAnnouncement("🧹 Cola vaciada.", null, { color: 0xffff00 });
       return false;
     }
 
-    // 2️⃣ COMANDOS (SIEMPRE)
     const command = parseCommand(message);
     if (command && command.type !== "REGULAR_MESSAGE") {
       const validation = validateCommand(
@@ -127,29 +122,26 @@ class GameController {
       return false;
     }
 
-    // 3️⃣ SIN PARTIDA → CHAT LIBRE
     if (!round || phase === GamePhase.WAITING || phase === GamePhase.RESULTS) {
       return true;
     }
 
     const isActive = this.isActiveRoundPlayer(player.id);
 
-    // 4️⃣ DISCUSIÓN → SOLO JUGADORES ACTIVOS
-    if (phase === GamePhase.DISCUSSION) {
-      if (isActive) return true;
-
+    if (!isActive) {
       this.adapter.sendAnnouncement(
-        "🙊 Estás fuera de esta partida.",
+        "🚫 Hay una partida en curso. Escribí !jugar para la próxima.",
         player.id,
         { color: 0xaaaaaa }
       );
       return false;
     }
 
-    // 5️⃣ PISTAS
-    if (phase === GamePhase.CLUES) {
-      if (!isActive) return false;
+    if (phase === GamePhase.DISCUSSION) {
+      return true;
+    }
 
+    if (phase === GamePhase.CLUES) {
       const currentId = round.clueOrder[round.currentClueIndex];
       if (player.id === currentId) {
         const clue = msg.split(/\s+/)[0];
@@ -166,10 +158,7 @@ class GameController {
       return false;
     }
 
-    // 6️⃣ VOTACIÓN
     if (phase === GamePhase.VOTING) {
-      if (!isActive) return false;
-
       const votedId = parseInt(msg);
       if (!isNaN(votedId)) {
         this.applyTransition(
@@ -186,18 +175,6 @@ class GameController {
     return false;
   }
 
-  isActiveRoundPlayer(playerId) {
-    const r = this.state.currentRound;
-    if (!r) return false;
-    return (
-      r.impostorId === playerId ||
-      r.normalPlayerIds.includes(playerId)
-    );
-  }
-
-  // ======================
-  // STATE
-  // ======================
   applyTransition(result) {
     this.state = result.state;
     this.executeSideEffects(result.sideEffects);
@@ -303,4 +280,3 @@ class GameController {
 }
 
 exports.GameController = GameController;
-
