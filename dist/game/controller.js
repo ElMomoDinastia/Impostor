@@ -91,18 +91,21 @@ class GameController {
 
   handlePlayerChat(player, message) {
     const msg = message.trim();
-    const msgLower = msg.toLowerCase();
     const phase = this.state.phase;
     const round = this.state.currentRound;
 
-    // 🧹 limpiar cola (admin)
-    if (msgLower === "!limpiar" && player.admin) {
+    /* =====================
+       ADMIN QUICK COMMAND
+    ====================== */
+    if (msg.toLowerCase() === "!limpiar" && player.admin) {
       this.state.queue = [];
       this.adapter.sendAnnouncement("🧹 Cola vaciada.", null, { color: 0xffff00 });
       return false;
     }
 
-    // 1️⃣ COMANDOS SIEMPRE PRIMERO
+    /* =====================
+       COMMAND HANDLING
+    ====================== */
     const command = parseCommand(message);
     if (command && command.type !== "REGULAR_MESSAGE") {
       const validation = validateCommand(
@@ -121,31 +124,40 @@ class GameController {
           { color: 0xff6b6b }
         );
       }
-      return false; // los comandos no se muestran
+      return false;
     }
 
-    // 2️⃣ SI NO HAY RONDA → CHAT LIBRE
+    /* =====================
+       NO GAME → FREE CHAT
+    ====================== */
     if (!round || phase === GamePhase.WAITING || phase === GamePhase.RESULTS) {
       return true;
     }
 
-    // 3️⃣ SOLO JUGADORES ACTIVOS HABLAN
+    /* =====================
+       ACTIVE PLAYER CHECK
+    ====================== */
     const isActive = this.isActiveRoundPlayer(player.id);
+
     if (!isActive) {
       this.adapter.sendAnnouncement(
-        "🚫 Hay una partida en curso. Escribí jugar para la próxima.",
+        "🚫 Estás fuera de la partida. Escribí 'jugar' para la próxima.",
         player.id,
         { color: 0xaaaaaa }
       );
       return false;
     }
 
-    // 4️⃣ DISCUSSION → CHAT LIBRE
+    /* =====================
+       DISCUSSION → FREE TALK
+    ====================== */
     if (phase === GamePhase.DISCUSSION) {
       return true;
     }
 
-    // 5️⃣ CLUES → solo el turno
+    /* =====================
+       CLUES
+    ====================== */
     if (phase === GamePhase.CLUES) {
       const currentId = round.clueOrder[round.currentClueIndex];
       if (player.id === currentId) {
@@ -163,7 +175,9 @@ class GameController {
       return false;
     }
 
-    // 6️⃣ VOTING → solo números
+    /* =====================
+       VOTING
+    ====================== */
     if (phase === GamePhase.VOTING) {
       const votedId = parseInt(msg, 10);
       if (!isNaN(votedId)) {
@@ -180,6 +194,10 @@ class GameController {
 
     return false;
   }
+
+  /* =====================
+     GAME STATE
+  ====================== */
 
   applyTransition(result) {
     this.state = result.state;
@@ -209,16 +227,28 @@ class GameController {
       if (e.type === "CLEAR_TIMER") this.clearPhaseTimer();
       if (e.type === "AUTO_START_GAME") {
         const ready = this.state.queue.filter((id) => this.state.players.has(id));
-        if (ready.length >= 5) {
+        if (ready.length >= 5)
           this.applyTransition(
             transition(this.state, {
               type: "START_GAME",
               footballers: this.footballers,
             })
           );
-        }
       }
     }
+  }
+
+  /* =====================
+     HELPERS
+  ====================== */
+
+  isActiveRoundPlayer(playerId) {
+    const r = this.state.currentRound;
+    if (!r) return false;
+    return (
+      r.impostorId === playerId ||
+      r.normalPlayerIds.includes(playerId)
+    );
   }
 
   containsSpoiler(clue, footballer) {
