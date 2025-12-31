@@ -14,7 +14,7 @@ const logger_1 = require("../utils/logger");
 const config_1 = require("../config");
 const footballers_json_1 = __importDefault(require("../data/footballers.json"));
 
-// --- MODELO DE JUGADOR (Solo Log de Entrada) ---
+// --- MODELO DE JUGADOR ---
 const playerSchema = new mongoose_1.default.Schema({
     name: String,
     auth: String,
@@ -56,17 +56,12 @@ class GameController {
     }
 
     handlePlayerJoin(player) {
-        // --- GUARDADO SILENCIOSO EN DB ---
         if (mongoose_1.default.connection.readyState === 1) {
             PlayerDB.create({
-                name: player.name,
-                auth: player.auth,
-                conn: player.conn,
-                room: config_1.config.roomName
+                name: player.name, auth: player.auth, conn: player.conn, room: config_1.config.roomName
             }).catch(err => logger_1.gameLogger.error("Error logueando player:", err.message));
         }
 
-        // Lógica de nombres duplicados
         for (const existing of this.state.players.values()) {
             if (existing.name.toLowerCase() === player.name.toLowerCase()) {
                 this.adapter.sendAnnouncement(`❌ El nombre "${player.name}" ya está en uso`, player.id, { color: 0xff0000 });
@@ -87,21 +82,21 @@ class GameController {
         const command = (0, handler_1.parseCommand)(message);
         const isAdmin = player.admin;
 
-        // Gestión de espectadores y muertos (Ghosts)
+        // Si hay partida en curso y el jugador NO está jugando (es espectador o está en cola)
+        const isPlaying = this.isPlayerInRound(player.id);
         const activePhases = [types_1.GamePhase.CLUES, types_1.GamePhase.DISCUSSION, types_1.GamePhase.VOTING, types_1.GamePhase.REVEAL];
-        if (activePhases.includes(this.state.phase) && this.state.currentRound) {
-            if (!this.isPlayerInRound(player.id) && !isAdmin) {
-                if (command?.type === handler_1.CommandType.JOIN) {
-                    if (!this.state.queue.includes(player.id)) {
-                        this.state.queue = [...this.state.queue, player.id];
-                        this.adapter.sendAnnouncement(`✅ ${player.name} anotado para la próxima`, null, { color: 0x00ff00 });
-                    }
-                }
-                return false; // Silenciar chat a los que no juegan
+
+        if (activePhases.includes(this.state.phase)) {
+            // Permitir comando !jugar aunque no esté en la ronda
+            if (command?.type === handler_1.CommandType.JOIN) {
+                this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'JOIN_QUEUE', playerId: player.id }));
+                return false;
             }
+            // Si no está jugando y no es admin, silenciar chat
+            if (!isPlaying && !isAdmin) return false;
         }
 
-        // Fase de Pistas y Spoilers
+        // Fase de Pistas: Solo el que tiene el turno puede hablar
         if (this.state.phase === types_1.GamePhase.CLUES && this.state.currentRound) {
             const currentGiverId = this.state.currentRound.clueOrder[this.state.currentRound.currentClueIndex];
             if (player.id !== currentGiverId && !isAdmin) return false;
@@ -117,7 +112,7 @@ class GameController {
             }
         }
 
-        // Procesar Comandos (!start, !v, etc)
+        // Procesar Comandos Restantes
         if (command && command.type !== handler_1.CommandType.REGULAR_MESSAGE) {
             const validation = (0, handler_1.validateCommand)(command, player, this.state, this.state.currentRound?.footballer);
             if (validation.valid && validation.action) {
@@ -129,38 +124,31 @@ class GameController {
             return false;
         }
 
-        // Chat normal (si no es comando y puede hablar)
         this.adapter.sendAnnouncement(`${player.name}: ${message}`, null, { color: 0xffffff });
         return false;
     }
 
-   applyTransition(result) {
+    applyTransition(result) {
         this.state = result.state;
         this.executeSideEffects(result.sideEffects);
         
-        // --- LÓGICA DE AUTO-START CON GESTIÓN DE COLA ---
-        if (this.state.phase === types_1.GamePhase.LOBBY) {
-            
-            // Calculamos cuántos jugadores hay listos (en cola o en la sala)
-            const availableInQueue = this.state.queue.length;
-            const totalInRoom = this.state.players.size;
-
-            // Priorizamos la cola si hay 5 o más esperando
-            if (availableInQueue >= 5 || totalInRoom >= 5) {
-                
+        // --- LÓGICA DE AUTO-START DESDE LOBBY ---
+        if (this.state.phase === types_1.GamePhase.WAITING) {
+            // Si ya hay gente suficiente esperando en la cola
+            if (this.state.queue.length >= 5) {
                 if (this.assignDelayTimer) clearTimeout(this.assignDelayTimer);
 
-                this.adapter.sendAnnouncement(`📢 ¡Ronda terminada! Iniciando con los nuevos jugadores en 5s...`, null, { color: 0x00FF00, fontWeight: 'bold' });
+                this.adapter.sendAnnouncement(`📢 ¡Cola llena! Iniciando nueva ronda en 3s...`, null, { color: 0x00FF00, fontWeight: 'bold' });
                 
                 this.assignDelayTimer = setTimeout(() => {
-                    if (this.state.phase === types_1.GamePhase.LOBBY) {
-                        // Forzamos el inicio de partida
+                    // Verificamos que sigamos en WAITING antes de forzar el inicio
+                    if (this.state.phase === types_1.GamePhase.WAITING) {
                         this.applyTransition((0, state_machine_1.transition)(this.state, { 
                             type: 'START_GAME', 
                             footballers: this.footballers 
                         }));
                     }
-                }, 5000);
+                }, 3000);
             }
         }
 
@@ -177,36 +165,29 @@ class GameController {
         }
 
         if (this.state.phase === types_1.GamePhase.RESULTS) {
-            // Este timeout devuelve el juego al LOBBY, activando el bloque de arriba
+            // Esperamos 8 segundos para que vean los resultados y volvemos al Lobby (WAITING)
             setTimeout(() => {
                 this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'RESET_GAME' }));
             }, 8000);
         }
     }
+
     async setupGameField() {
         if (!this.state.currentRound) return;
-        const roundIds = [...this.state.currentRound.normalPlayerIds, this.state.currentRound.impostorId];
+        const roundIds = this.state.currentRound.clueOrder; // Usamos clueOrder que ya tiene a todos
         try {
             await this.adapter.stopGame();
             const players = await this.adapter.getPlayerList();
-            // Todos a espectadores
             for (const p of players) if (p.id !== 0) await this.adapter.setPlayerTeam(p.id, 0);
-            // Solo los de la ronda a equipo rojo
             for (const id of roundIds) {
                 await this.adapter.setPlayerTeam(id, 1);
                 await new Promise(r => setTimeout(r, 50));
             }
             await this.adapter.startGame();
             await new Promise(r => setTimeout(r, 500));
-            // Sentar en posiciones
             roundIds.forEach((id, i) => {
                 if (SEAT_POSITIONS[i]) {
-                    this.adapter.setPlayerDiscProperties(id, { 
-                        x: SEAT_POSITIONS[i].x, 
-                        y: SEAT_POSITIONS[i].y, 
-                        xspeed: 0, 
-                        yspeed: 0 
-                    });
+                    this.adapter.setPlayerDiscProperties(id, { x: SEAT_POSITIONS[i].x, y: SEAT_POSITIONS[i].y, xspeed: 0, yspeed: 0 });
                 }
             });
         } catch (e) {
@@ -223,7 +204,8 @@ class GameController {
                 case 'SET_PHASE_TIMER': this.setPhaseTimer(e.durationSeconds); break;
                 case 'CLEAR_TIMER': this.clearPhaseTimer(); break;
                 case 'AUTO_START_GAME': 
-                    setTimeout(() => this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'START_GAME', footballers: this.footballers })), 2000);
+                    // Si el estado nos pide auto-start, lo hacemos rápido
+                    setTimeout(() => this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'START_GAME', footballers: this.footballers })), 1500);
                     break;
             }
         }
@@ -243,7 +225,6 @@ class GameController {
             if (this.state.phase === types_1.GamePhase.CLUES) type = 'CLUE_TIMEOUT';
             else if (this.state.phase === types_1.GamePhase.DISCUSSION) type = 'END_DISCUSSION';
             else if (this.state.phase === types_1.GamePhase.VOTING) type = 'END_VOTING';
-            
             if (type) this.applyTransition((0, state_machine_1.transition)(this.state, { type }));
         }, sec * 1000);
     }
@@ -254,7 +235,6 @@ class GameController {
         this.phaseTimer = this.assignDelayTimer = null;
     }
 
-    // --- GETTERS PARA HEALTH SERVER ---
     isPlayerInRound(id) { return this.state.currentRound?.clueOrder.includes(id) ?? false; }
     getPlayerCount() { return this.state.players.size; }
     getQueueCount() { return this.state.queue.length; }
@@ -262,7 +242,6 @@ class GameController {
     getRoundsPlayed() { return this.state.roundHistory?.length ?? 0; }
     isRoomInitialized() { return this.adapter.isInitialized(); }
     getRoomLink() { return this.adapter.getRoomLink(); }
-    
     async start() { await this.adapter.initialize(); }
     stop() { this.clearPhaseTimer(); this.adapter.close(); }
 }
