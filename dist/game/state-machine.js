@@ -498,7 +498,12 @@ function handleSkipPhase(state) {
     }
 }
 function handleResetGame(state) {
-    return { state: { ...state, phase: types_1.GamePhase.WAITING, currentRound: null }, sideEffects: [] };
+    const sideEffects = [];
+    // Si al terminar la ronda ya hay 5 listos, arrancar la siguiente de una
+    if (state.queue.length >= state.settings.minPlayers) {
+        sideEffects.push({ type: 'AUTO_START_GAME' });
+    }
+    return { state: { ...state, phase: types_1.GamePhase.WAITING, currentRound: null }, sideEffects };
 }
 function handleResetRound(state) {
     // Admin command to skip current round entirely and go back to waiting
