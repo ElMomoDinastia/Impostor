@@ -54,46 +54,45 @@ class GameController {
         this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'PLAYER_JOIN', player: gamePlayer }));
     }
 
-   handlePlayerLeave(player) {
-        // 1. Verificamos si el que se va estaba participando ACTIVAMENTE de la ronda
-        const estabaJugando = this.isPlayerInRound(player.id);
+handlePlayerLeave(player) {
+    // 1. Limpieza de seguridad: lo borramos de la cola de espera de inmediato
+    this.state.queue = this.state.queue.filter(id => id !== player.id);
 
-        // 2. Aplicamos la transición normal para sacarlo del sistema
-        this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'PLAYER_LEAVE', playerId: player.id }));
+    // 2. Chequeamos si estaba en la partida ANTES de que el motor lo borre
+    const estabaJugando = this.isPlayerInRound(player.id);
+    const idDelQueTieneQueHablar = this.state.currentRound?.clueOrder[this.state.currentRound.currentClueIndex];
 
-        // 3. Si el juego está en curso y el que se fue era un jugador activo:
-        if (this.state.phase !== types_1.GamePhase.WAITING && estabaJugando) {
+    // 3. Aplicamos la transición al motor lógico
+    this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'PLAYER_LEAVE', playerId: player.id }));
+
+    // 4. Lógica de cancelación o salto de turno
+    if (this.state.phase !== types_1.GamePhase.WAITING && estabaJugando) {
+        
+        // Usamos la lista de jugadores que el motor dejó después del LEAVE
+        const vivosAhora = this.state.currentRound?.clueOrder.length || 0;
+
+        // Si quedan menos de 3, RESET TOTAL
+        if (vivosAhora < 3) {
+            this.clearPhaseTimer();
+            this.state.phase = types_1.GamePhase.WAITING;
+            this.state.currentRound = null;
+            // No reseteamos la queue aquí para dejar que los que quedaron se vuelvan a anotar
             
-            // Contamos cuántos quedan VIVOS/ACTIVOS en la ronda actual
-            const vivosAhora = this.state.currentRound?.clueOrder.length || 0;
-
-            // Si quedan menos de 3 jugadores activos, la partida ya no tiene sentido
-            if (vivosAhora < 3) {
+            this.adapter.stopGame(); 
+            this.adapter.sendAnnouncement("❌ PARTIDA CANCELADA: Pocos jugadores activos.", null, { color: 0xFF4444, fontWeight: "bold" });
+            this.adapter.sendAnnouncement("⚽ Escriban !jugar para iniciar otra.", null, { color: 0x00FFCC });
+        } else {
+            // Si la partida sigue, pero el que se fue tenía que dar la pista JUSTO AHORA:
+            if (this.state.phase === types_1.GamePhase.CLUES && player.id === idDelQueTieneQueHablar) {
+                this.adapter.sendAnnouncement(`🏃 @${player.name.toUpperCase()} se fue en su turno. Saltando...`, null, { color: 0xFFFF00 });
                 this.clearPhaseTimer();
-                
-                // Reset total del estado
-                this.state.phase = types_1.GamePhase.WAITING;
-                this.state.currentRound = null;
-                this.state.queue = []; 
-
-                this.adapter.stopGame(); 
-                this.adapter.sendAnnouncement("❌ PARTIDA CANCELADA: Se fueron demasiados jugadores activos.", null, { color: 0xFF4444, fontWeight: "bold" });
-                this.adapter.sendAnnouncement("⚽ Necesitamos al menos 3 jugadores para seguir. ¡Escriban !jugar!", null, { color: 0x00FFCC });
+                this.setPhaseTimer(0.5); // Salto casi instantáneo al siguiente
             } else {
-                // Si todavía quedan suficientes, avisamos que alguien abandonó el barco
-                this.adapter.sendAnnouncement(`🏃 @${player.name.toUpperCase()} abandonó la partida. Seguimos con los que quedan...`, null, { color: 0xFFFF00 });
-                
-                // Si era su turno de dar pista, saltamos al siguiente
-                if (this.state.phase === types_1.GamePhase.CLUES) {
-                    const currentGiverId = this.state.currentRound?.clueOrder[this.state.currentRound.currentClueIndex];
-                    if (player.id === currentGiverId) {
-                        this.clearPhaseTimer();
-                        this.setPhaseTimer(1); // Salto rápido al siguiente turno
-                    }
-                }
+                this.adapter.sendAnnouncement(`🏃 @${player.name.toUpperCase()} abandonó la partida.`, null, { color: 0xCCCCCC });
             }
         }
     }
+}
 
     handlePlayerChat(player, message) {
         const msg = message.trim();
@@ -250,17 +249,26 @@ class GameController {
         return n(foot).split(/\s+/).some(p => p.length > 2 && c.includes(p));
     }
 
-    setPhaseTimer(sec) {
+   setPhaseTimer(sec) {
         this.clearPhaseTimer();
         this.phaseTimer = setTimeout(() => {
-            let type = null;
             if (this.state.phase === types_1.GamePhase.CLUES) {
-                this.adapter.sendAnnouncement("⏰ TIEMPO AGOTADO. Pasando de turno...", null, { color: 0xFFA500, fontWeight: "bold" });
                 const currentGiverId = this.state.currentRound?.clueOrder[this.state.currentRound.currentClueIndex];
-                this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_CLUE', playerId: currentGiverId, clue: "--- NO DIO PISTA ---" }));
+                
+                this.adapter.getPlayerList().then(players => {
+                    const online = players.find(p => p.id === currentGiverId);
+                    if (!online) {
+                        this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_CLUE', playerId: currentGiverId, clue: "--- DESCONECTADO ---" }));
+                    } else {
+                        this.adapter.sendAnnouncement("⏰ TIEMPO AGOTADO.", null, { color: 0xFFA500 });
+                        this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_CLUE', playerId: currentGiverId, clue: "--- NO DIO PISTA ---" }));
+                    }
+                });
                 return;
             }
-            else if (this.state.phase === types_1.GamePhase.DISCUSSION) type = 'END_DISCUSSION';
+            
+            let type = null;
+            if (this.state.phase === types_1.GamePhase.DISCUSSION) type = 'END_DISCUSSION';
             else if (this.state.phase === types_1.GamePhase.VOTING) type = 'END_VOTING';
             if (type) this.applyTransition((0, state_machine_1.transition)(this.state, { type }));
         }, sec * 1000);
