@@ -52,10 +52,15 @@ class GameController {
         this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'PLAYER_JOIN', player: gamePlayer }));
     }
 
-handlePlayerLeave(player) {
+    handlePlayerLeave(player) {
         const estabaJugando = this.isPlayerInRound(player.id);
         const eraImpostor = this.state.currentRound?.impostorId === player.id;
         const eraSuTurno = this.state.currentRound?.clueOrder[this.state.currentRound.currentClueIndex] === player.id;
+
+        // 🔥 Sacar de la cola SOLO al jugador que se va
+        if (this.state.queue.includes(player.id)) {
+            this.state.queue = this.state.queue.filter(id => id !== player.id);
+        }
 
         this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'PLAYER_LEAVE', playerId: player.id }));
 
@@ -65,13 +70,14 @@ handlePlayerLeave(player) {
             this.clearPhaseTimer();
             this.state.phase = types_1.GamePhase.WAITING;
             this.state.currentRound = null;
-            this.state.queue = [];
             this.adapter.stopGame();
 
             this.adapter.sendAnnouncement("━━━━━━━━━━━━━━━━━━━━━━━━━━━━", null, { color: 0xFF4444 });
             this.adapter.sendAnnouncement(`🚫 EL IMPOSTOR @${player.name.toUpperCase()} ABANDONÓ LA SALA.`, null, { color: 0xFF4444, fontWeight: "bold" });
             this.adapter.sendAnnouncement("🏆 ¡VICTORIA PARA LOS INOCENTES!", null, { color: 0x00FF00, fontWeight: "bold" });
             this.adapter.sendAnnouncement("━━━━━━━━━━━━━━━━━━━━━━━━━━━━", null, { color: 0xFF4444 });
+            
+            this.checkAutoStart();
             return;
         }
 
@@ -80,23 +86,27 @@ handlePlayerLeave(player) {
             this.clearPhaseTimer();
             this.state.phase = types_1.GamePhase.WAITING;
             this.state.currentRound = null;
-            this.state.queue = [];
             this.adapter.stopGame();
             this.adapter.sendAnnouncement("❌ PARTIDA CANCELADA: Pocos jugadores activos.", null, { color: 0xFF4444 });
+            
+            this.checkAutoStart();
             return;
         }
 
         if (this.state.phase === types_1.GamePhase.CLUES && eraSuTurno) {
-            this.adapter.sendAnnouncement(`🏃 @${player.name.toUpperCase()} se fue en su turno. Saltando...`, null, { color: 0xFFFF00 });
+            this.adapter.sendAnnouncement(`🏃 @${player.name.toUpperCase()} se fue en su turno.`, null, { color: 0xFFFF00 });
             this.clearPhaseTimer();
             this.setPhaseTimer(0.5); 
-        } 
-        else if (this.state.phase === types_1.GamePhase.VOTING) {
-            this.adapter.sendAnnouncement(`🏃 @${player.name.toUpperCase()} abandonó. Recalculando votos...`, null, { color: 0xCCCCCC });
-            this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_VOTE', playerId: player.id, votedId: null })); // Voto nulo para no trabar
-        }
-        else {
+        } else if (this.state.phase === types_1.GamePhase.VOTING) {
+            this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'SUBMIT_VOTE', playerId: player.id, votedId: null }));
+        } else {
             this.adapter.sendAnnouncement(`🏃 @${player.name.toUpperCase()} abandonó la partida.`, null, { color: 0xCCCCCC });
+        }
+    }
+
+    checkAutoStart() {
+        if (this.state.queue.length >= 5 && this.state.phase === types_1.GamePhase.WAITING) {
+            this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'START_GAME', footballers: this.footballers }));
         }
     }
 
@@ -118,9 +128,7 @@ handlePlayerLeave(player) {
             }
             if (!this.state.queue.includes(player.id)) {
                 this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'JOIN_QUEUE', playerId: player.id }));
-                if (this.state.queue.length >= 5 && this.state.phase === types_1.GamePhase.WAITING) {
-                    this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'START_GAME', footballers: this.footballers }));
-                }
+                this.checkAutoStart();
             }
             return false;
         }
@@ -161,7 +169,8 @@ handlePlayerLeave(player) {
         this.adapter.sendAnnouncement(`${chatPrefix}${player.name}: ${msg}`, null, { color: chatColor });
         return false; 
     }
-        applyTransition(result) {
+
+    applyTransition(result) {
         this.state = result.state;
         this.executeSideEffects(result.sideEffects);
 
@@ -196,11 +205,11 @@ handlePlayerLeave(player) {
             setTimeout(() => {
                 this.state.phase = types_1.GamePhase.WAITING;
                 this.state.currentRound = null;
-                this.state.queue = []; 
                 
                 this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'RESET_GAME' }));
+                this.adapter.sendAnnouncement("⚽ ¡PARTIDA FINALIZADA!", null, { color: 0x00FFCC });
                 
-                this.adapter.sendAnnouncement("⚽ ¡SALA LIBRE! Escriban !jugar para otra partida.", null, { color: 0x00FFCC });
+                this.checkAutoStart();
             }, 5000);
         }
     }
@@ -239,9 +248,7 @@ handlePlayerLeave(player) {
                     break;
 
                 case 'AUTO_START_GAME': 
-                    if (this.state.queue.length >= 5 && this.state.phase === types_1.GamePhase.WAITING) {
-                        this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'START_GAME', footballers: this.footballers }));
-                    }
+                    this.checkAutoStart();
                     break;
             }
         }
