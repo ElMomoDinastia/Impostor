@@ -18,7 +18,7 @@ function transition(state, action) {
                 sideEffects: [{ type: 'ANNOUNCE_PRIVATE', playerId: action.player.id, message: '⚽ ¡Bienvenido! Escribe "jugar" para entrar.' }] 
             };
         
-      case 'PLAYER_LEAVE': {
+        case 'PLAYER_LEAVE': {
             const playersAfterLeave = new Map(state.players);
             playersAfterLeave.delete(action.playerId);
             const queueAfterLeave = state.queue.filter(id => id !== action.playerId);
@@ -60,12 +60,6 @@ function transition(state, action) {
             };
         }
 
-            return { 
-                state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, currentRound: newRound }, 
-                sideEffects: [] 
-            };
-        }
-
         case 'JOIN_QUEUE':
             if (state.queue.includes(action.playerId)) return { state, sideEffects: [] };
             const updatedQueue = [...state.queue, action.playerId];
@@ -96,7 +90,6 @@ function transition(state, action) {
                 const msg = id === impostorId ? '🕵️ ERES EL IMPOSTOR. Disimula y sobrevive.' : `⚽ EL JUGADOR ES: ${footballer.toUpperCase()}`;
                 effects.push({ type: 'ANNOUNCE_PRIVATE', playerId: id, message: msg });
             });
-            // Automáticamente transicionamos a clues después de asignar
             return { 
                 state: { ...state, phase: types_1.GamePhase.ASSIGN, currentRound: round, queue: state.queue.slice(5) }, 
                 sideEffects: effects 
@@ -106,8 +99,6 @@ function transition(state, action) {
         case 'SUBMIT_CLUE': {
             const rClue = state.currentRound;
             if (!rClue || state.phase !== types_1.GamePhase.CLUES) return { state, sideEffects: [] };
-
-            // Evitar que el mismo jugador mande varias pistas en su turno (Anti-Spam)
             if (rClue.clues.has(action.playerId)) return { state, sideEffects: [] };
             
             const newClues = new Map(rClue.clues).set(action.playerId, action.clue);
@@ -139,7 +130,6 @@ function transition(state, action) {
             const nextPlayer = state.players.get(nextPlayerId);
 
             if (!nextPlayer) {
-                // Si el siguiente se fue, disparamos acción inmediata para saltar
                 return { 
                     state: { ...state, currentRound: { ...rClue, clues: newClues, currentClueIndex: nextIndex } }, 
                     sideEffects: [{ type: 'SET_PHASE_TIMER', durationSeconds: 0.1 }] 
@@ -178,8 +168,6 @@ function transition(state, action) {
         case 'SUBMIT_VOTE': {
             const rVote = state.currentRound;
             if (!rVote || state.phase !== types_1.GamePhase.VOTING) return { state, sideEffects: [] };
-            
-            // Un solo voto por persona
             if (rVote.votes.has(action.playerId)) return { state, sideEffects: [] };
 
             const newVotes = new Map(rVote.votes).set(action.playerId, action.votedId);
@@ -231,7 +219,6 @@ function handleEndVoting(state) {
     const votedPlayer = state.players.get(votedOutId);
     const votedName = (votedPlayer?.name || "Alguien").toUpperCase();
 
-    // 2. CASO: MUERE EL IMPOSTOR (Ganan Inocentes)
     if (isImpostor) {
         return { 
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
@@ -241,14 +228,12 @@ function handleEndVoting(state) {
                 { type: 'ANNOUNCE_PUBLIC', message: `🎯 ¡LO CAZARON! ${votedName} ERA EL IMPOSTOR`, style: { color: 0x00FF00, fontWeight: "bold" } },
                 { type: 'ANNOUNCE_PUBLIC', message: `🏆 ¡VICTORIA PARA LOS INOCENTES!`, style: { color: 0x00FF00, fontWeight: "bold" } },
                 { type: 'ANNOUNCE_PUBLIC', message: `━━━━━━━━━━━━━━━━━━━━━━━━` },
-                // EFECTO PARA MONGO
                 { type: 'UPDATE_STATS', winnerRole: 'INOCENTE', winners: round.clueOrder.filter(id => id !== round.impostorId) },
                 { type: 'SET_PHASE_TIMER', durationSeconds: 7, nextAction: 'RESET_GAME' }
             ] 
         };
     } 
 
-    // 3. CASO: MUERE INOCENTE
     const remainingInnocents = round.normalPlayerIds.filter(id => id !== votedOutId);
     
     if (remainingInnocents.length <= 1) {
@@ -261,14 +246,12 @@ function handleEndVoting(state) {
                 { type: 'ANNOUNCE_PUBLIC', message: `💀 ¡GAME OVER! GANÓ EL IMPOSTOR (${impName})`, style: { color: 0xFF0000, fontWeight: "bold" } },
                 { type: 'ANNOUNCE_PUBLIC', message: `❌ ${votedName} ERA INOCENTE.`, style: { color: 0xFFFFFF } },
                 { type: 'ANNOUNCE_PUBLIC', message: `━━━━━━━━━━━━━━━━━━━━━━━━` },
-                // EFECTO PARA MONGO
                 { type: 'UPDATE_STATS', winnerRole: 'IMPOSTOR', winners: [round.impostorId] },
                 { type: 'SET_PHASE_TIMER', durationSeconds: 7, nextAction: 'RESET_GAME' }
             ] 
         };
     }
 
-    // 4. LA PARTIDA SIGUE (Nueva ronda de pistas)
     const nextClueOrder = round.clueOrder.filter(id => id !== votedOutId);
     const firstPlayerId = nextClueOrder[0];
     const firstPlayerName = (state.players.get(firstPlayerId)?.name || "ALGUIEN").toUpperCase();
@@ -288,7 +271,6 @@ function handleEndVoting(state) {
             { type: 'CLEAR_TIMER' },
             { type: 'ANNOUNCE_PUBLIC', message: `❌ ${votedName} ERA INOCENTE.`, style: { color: 0xFF4444, fontWeight: "bold" } },
             { type: 'ANNOUNCE_PUBLIC', message: `📝 NUEVA RONDA DE PISTAS...`, style: { color: 0xFFFF00, fontWeight: "bold" } },
-            // FIX DEL TURNO:
             { type: 'ANNOUNCE_PUBLIC', message: `🔔 TURNO DE: ${firstPlayerName}`, style: { color: 0x00FFCC, fontWeight: "bold" } },
             { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.clueTimeSeconds }
         ] 
