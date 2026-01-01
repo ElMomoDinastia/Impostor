@@ -11,12 +11,21 @@ function shuffle(array) {
 
 function transition(state, action) {
     switch (action.type) {
-        case 'PLAYER_JOIN':
-            const newPlayers = new Map(state.players).set(action.player.id, action.player);
-            return { 
-                state: { ...state, players: newPlayers }, 
-                sideEffects: [{ type: 'ANNOUNCE_PRIVATE', playerId: action.player.id, message: '⚽ ¡Bienvenido! Escribe "jugar" para entrar.' }] 
-            };
+       case 'PLAYER_JOIN':
+    const newPlayers = new Map(state.players);
+    newPlayers.set(action.player.id, {
+        ...action.player, 
+        joinedAt: Date.now()
+    });
+
+    return { 
+        state: { ...state, players: newPlayers }, 
+        sideEffects: [{ 
+            type: 'ANNOUNCE_PRIVATE', 
+            playerId: action.player.id, 
+            message: '⚽ ¡Bienvenido! Escribe "jugar" para entrar.' 
+        }] 
+    };
         
         case 'PLAYER_LEAVE': {
             const playersAfterLeave = new Map(state.players);
