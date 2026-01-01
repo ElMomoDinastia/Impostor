@@ -23,6 +23,7 @@ async function main() {
         try {
             // Ponemos un timeout para que no se quede colgado si la IP no está en whitelist
             await mongoose_1.default.connect(mongoURI, { serverSelectionTimeoutMS: 5000 });
+            global.db = mongoose_1.default.connection;
             logger_1.logger.info('✅ Conectado a MongoDB Atlas con éxito');
         } catch (error) {
             logger_1.logger.error('❌ Error al conectar a MongoDB. El juego funcionará sin base de datos.');
