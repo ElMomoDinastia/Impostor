@@ -15,11 +15,25 @@ function transition(state, action) {
             const newPlayers = new Map(state.players).set(action.player.id, action.player);
             return { state: { ...state, players: newPlayers }, sideEffects: [{ type: 'ANNOUNCE_PRIVATE', playerId: action.player.id, message: '⚽ ¡Bienvenido! Escribe "!jugar" para entrar.' }] };
         
-        case 'PLAYER_LEAVE':
+        case 'PLAYER_LEAVE': {
             const playersAfterLeave = new Map(state.players);
             playersAfterLeave.delete(action.playerId);
             const queueAfterLeave = state.queue.filter(id => id !== action.playerId);
-            return { state: { ...state, players: playersAfterLeave, queue: queueAfterLeave }, sideEffects: [] };
+            
+            let newRound = state.currentRound;
+            if (state.currentRound) {
+                newRound = {
+                    ...state.currentRound,
+                    clueOrder: state.currentRound.clueOrder.filter(id => id !== action.playerId),
+                    normalPlayerIds: state.currentRound.normalPlayerIds.filter(id => id !== action.playerId)
+                };
+            }
+
+            return { 
+                state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, currentRound: newRound }, 
+                sideEffects: [] 
+            };
+        }
 
         case 'JOIN_QUEUE':
             if (state.queue.includes(action.playerId)) return { state, sideEffects: [] };
@@ -82,15 +96,24 @@ function transition(state, action) {
                 };
             }
 
-            const nextPlayerId = rClue.clueOrder[rClue.currentClueIndex + 1];
+            // Lógica para el siguiente turno
+            const nextIndex = rClue.currentClueIndex + 1;
+            const nextPlayerId = rClue.clueOrder[nextIndex];
             const nextPlayer = state.players.get(nextPlayerId);
-            const nextName = nextPlayer ? nextPlayer.name.toUpperCase() : "AUSENTE (SALTANDO...)";
+
+            // FIX: Si el siguiente no existe (se fue), saltamos rápido al que sigue
+            if (!nextPlayer) {
+                return { 
+                    state: { ...state, currentRound: { ...rClue, clues: newClues, currentClueIndex: nextIndex } }, 
+                    sideEffects: [{ type: 'SET_PHASE_TIMER', durationSeconds: 0.1 }] 
+                };
+            }
 
             return { 
-                state: { ...state, currentRound: { ...rClue, clues: newClues, currentClueIndex: rClue.currentClueIndex + 1 } }, 
+                state: { ...state, currentRound: { ...rClue, clues: newClues, currentClueIndex: nextIndex } }, 
                 sideEffects: [
                     { type: 'ANNOUNCE_PUBLIC', message: `💬 Pista: "${action.clue}"` },
-                    { type: 'ANNOUNCE_PUBLIC', message: `🔔 TURNO DE: ${nextName}`, style: { color: 0xFFFF00, fontWeight: "bold" } },
+                    { type: 'ANNOUNCE_PUBLIC', message: `🔔 TURNO DE: ${nextPlayer.name.toUpperCase()}`, style: { color: 0xFFFF00, fontWeight: "bold" } },
                     { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.clueTimeSeconds }
                 ]
             };
@@ -99,7 +122,10 @@ function transition(state, action) {
         case 'END_DISCUSSION': {
             if (!state.currentRound) return { state, sideEffects: [] };
             const list = state.currentRound.clueOrder
-                .map((id, i) => `[ ${i + 1} ] ${state.players.get(id)?.name.toUpperCase() || "---"}`)
+                .map((id, i) => {
+                    const p = state.players.get(id);
+                    return `[ ${i + 1} ] ${p ? p.name.toUpperCase() : "---"}`;
+                })
                 .join('   ');
 
             return { 
@@ -146,6 +172,14 @@ function handleEndVoting(state) {
     const counts = {};
     round.votes.forEach(v => counts[v] = (counts[v] || 0) + 1);
     const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    
+    if (sorted.length === 0) {
+        return { 
+            state: { ...state, phase: types_1.GamePhase.REVEAL },
+            sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message: "❌ NADIE VOTÓ. Empate técnico." }, { type: 'RESET_GAME' }]
+        };
+    }
+
     const votedOutId = parseInt(sorted[0]); 
     const isImpostor = votedOutId === round.impostorId;
     const votedName = (state.players.get(votedOutId)?.name || "Alguien").toUpperCase();
@@ -172,7 +206,7 @@ function handleEndVoting(state) {
             sideEffects: [
                 { type: 'CLEAR_TIMER' },
                 { type: 'ANNOUNCE_PUBLIC', message: `━━━━━━━━━━━━━━━━━━━━━━━━` },
-                { type: 'ANNOUNCE_PUBLIC', message: `💀 ¡GAME OVER! GANÓ ${impName}`, style: { color: 0xFF0000, fontWeight: "bold" } },
+                { type: 'ANNOUNCE_PUBLIC', message: `💀 ¡GAME OVER! GANÓ EL IMPOSTOR (${impName})`, style: { color: 0xFF0000, fontWeight: "bold" } },
                 { type: 'ANNOUNCE_PUBLIC', message: `❌ ${votedName} ERA INOCENTE.`, style: { color: 0xFFFFFF } },
                 { type: 'ANNOUNCE_PUBLIC', message: `━━━━━━━━━━━━━━━━━━━━━━━━` }
             ] 
