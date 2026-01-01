@@ -1,4 +1,4 @@
-"use strict";
+""use strict";
 
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -37,7 +37,6 @@ class GameController {
             onPlayerChat: this.handlePlayerChat.bind(this),
             onRoomLink: (link) => {
                 logger_1.gameLogger.info({ link }, 'Room ready');
-                
                 setTimeout(() => {
                     this.adapter.sendAnnouncement(" ", null); 
                     this.adapter.sendAnnouncement("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓", null, { color: 0x00FFCC });
@@ -53,37 +52,47 @@ class GameController {
         this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'PLAYER_JOIN', player: gamePlayer }));
     }
 
-handlePlayerLeave(player) {
-    this.state.queue = this.state.queue.filter(id => id !== player.id);
+    handlePlayerLeave(player) {
+        const estabaJugando = this.isPlayerInRound(player.id);
+        const eraImpostor = this.state.currentRound?.impostorId === player.id;
+        const eraSuTurno = this.state.currentRound?.clueOrder[this.state.currentRound.currentClueIndex] === player.id;
 
-    const estabaJugando = this.isPlayerInRound(player.id);
-    const idDelQueTieneQueHablar = this.state.currentRound?.clueOrder[this.state.currentRound.currentClueIndex];
+        // 1. Aplicamos la transición en el estado
+        this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'PLAYER_LEAVE', playerId: player.id }));
 
-    this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'PLAYER_LEAVE', playerId: player.id }));
+        if (!estabaJugando) return;
 
-    if (this.state.phase !== types_1.GamePhase.WAITING && estabaJugando) {
-        
+        // CASO 1: SE FUE EL IMPOSTOR (La partida termina por victoria inocente)
+        if (eraImpostor) {
+            this.clearPhaseTimer();
+            this.adapter.stopGame(); 
+            return;
+        }
+
+        // CASO 2: QUEDARON POCOS JUGADORES
         const vivosAhora = this.state.currentRound?.clueOrder.length || 0;
-
-        if (vivosAhora < 3) {
+        if (this.state.phase !== types_1.GamePhase.WAITING && vivosAhora < 3) {
             this.clearPhaseTimer();
             this.state.phase = types_1.GamePhase.WAITING;
             this.state.currentRound = null;
             
             this.adapter.stopGame(); 
+            this.adapter.sendAnnouncement("━━━━━━━━━━━━━━━━━━━━━━━━━━━━", null, { color: 0xFF4444 });
             this.adapter.sendAnnouncement("❌ PARTIDA CANCELADA: Pocos jugadores activos.", null, { color: 0xFF4444, fontWeight: "bold" });
-            this.adapter.sendAnnouncement("⚽ Escriban !jugar para iniciar otra.", null, { color: 0x00FFCC });
+            this.adapter.sendAnnouncement("⚽ Escriban !jugar para iniciar otra tanda.", null, { color: 0x00FFCC, fontWeight: "bold" });
+            this.adapter.sendAnnouncement("━━━━━━━━━━━━━━━━━━━━━━━━━━━━", null, { color: 0xFF4444 });
+            return;
+        }
+
+        // CASO 3: SE FUE EN SU TURNO DE PISTA
+        if (this.state.phase === types_1.GamePhase.CLUES && eraSuTurno) {
+            this.adapter.sendAnnouncement(`🏃 @${player.name.toUpperCase()} se fue en su turno. Saltando...`, null, { color: 0xFFFF00 });
+            this.clearPhaseTimer();
+            this.setPhaseTimer(0.5); 
         } else {
-            if (this.state.phase === types_1.GamePhase.CLUES && player.id === idDelQueTieneQueHablar) {
-                this.adapter.sendAnnouncement(`🏃 @${player.name.toUpperCase()} se fue en su turno. Saltando...`, null, { color: 0xFFFF00 });
-                this.clearPhaseTimer();
-                this.setPhaseTimer(0.5); 
-            } else {
-                this.adapter.sendAnnouncement(`🏃 @${player.name.toUpperCase()} abandonó la partida.`, null, { color: 0xCCCCCC });
-            }
+            this.adapter.sendAnnouncement(`🏃 @${player.name.toUpperCase()} abandonó la partida.`, null, { color: 0xCCCCCC });
         }
     }
-}
 
     handlePlayerChat(player, message) {
         const msg = message.trim();
@@ -110,7 +119,6 @@ handlePlayerLeave(player) {
             return false;
         }
 
-        // --- Sistema de Votación ---
         if (this.state.phase === types_1.GamePhase.VOTING && isPlaying) {
             const voteNum = parseInt(msg);
             if (!isNaN(voteNum) && voteNum > 0 && voteNum <= (this.state.currentRound?.clueOrder.length || 0)) {
@@ -123,7 +131,6 @@ handlePlayerLeave(player) {
             }
         }
 
-        // --- Entrega de Pistas ---
         if (this.state.phase === types_1.GamePhase.CLUES && isPlaying) {
             const currentGiverId = this.state.currentRound.clueOrder[this.state.currentRound.currentClueIndex];
             if (player.id === currentGiverId) {
@@ -136,24 +143,14 @@ handlePlayerLeave(player) {
             }
         }
 
-        // Silenciar chat durante fases críticas
         const isMutedPhase = [types_1.GamePhase.CLUES, types_1.GamePhase.VOTING].includes(this.state.phase);
         if (isMutedPhase && !isPlaying && !player.admin) return false;
 
-        // --- FORMATO DE CHAT PERSONALIZADO ---
         let chatPrefix = "";
         let chatColor = 0xFFFFFF; 
-
-        if (player.admin) {
-            chatPrefix = "⭐ ";
-            chatColor = 0x00FFFF;
-        } else if (isPlaying) {
-            chatPrefix = "👤 ";
-            chatColor = 0xADFF2F;
-        } else {
-            chatPrefix = "👀 "; 
-            chatColor = 0xCCCCCC;
-        }
+        if (player.admin) { chatPrefix = "⭐ "; chatColor = 0x00FFFF; }
+        else if (isPlaying) { chatPrefix = "👤 "; chatColor = 0xADFF2F; }
+        else { chatPrefix = "👀 "; chatColor = 0xCCCCCC; }
 
         this.adapter.sendAnnouncement(`${chatPrefix}${player.name}: ${msg}`, null, { color: chatColor });
         return false; 
@@ -192,25 +189,7 @@ handlePlayerLeave(player) {
         }
     }
 
-    async setupGameField() {
-        if (!this.state.currentRound) return;
-        const ids = this.state.currentRound.clueOrder;
-        try {
-            await this.adapter.stopGame();
-            const all = await this.adapter.getPlayerList();
-            for (const p of all) if (p.id !== 0) await this.adapter.setPlayerTeam(p.id, 0);
-            for (const id of ids) await this.adapter.setPlayerTeam(id, 1);
-            await this.adapter.startGame();
-            
-            setTimeout(() => {
-                ids.forEach((id, i) => {
-                    this.adapter.setPlayerDiscProperties(id, { x: SEAT_POSITIONS[i].x, y: SEAT_POSITIONS[i].y, xspeed: 0, yspeed: 0 });
-                });
-            }, 500);
-        } catch (e) { logger_1.gameLogger.error("Field Error:", e); }
-    }
-
-    executeSideEffects(effects) {
+    async executeSideEffects(effects) {
         if (!effects) return;
         for (const e of effects) {
             switch (e.type) {
@@ -222,6 +201,27 @@ handlePlayerLeave(player) {
                     break;
                 case 'SET_PHASE_TIMER': this.setPhaseTimer(e.durationSeconds); break;
                 case 'CLEAR_TIMER': this.clearPhaseTimer(); break;
+                
+                case 'UPDATE_STATS':
+                    try {
+                        if (global.db) {
+                            for (const pId of e.winners) {
+                                const p = this.state.players.get(pId);
+                                if (p && p.auth) {
+                                    await global.db.collection('users').updateOne(
+                                        { auth: p.auth },
+                                        { 
+                                            $inc: { wins: 1, xp: 50, played: 1 },
+                                            $set: { lastSeen: new Date(), name: p.name }
+                                        },
+                                        { upsert: true }
+                                    );
+                                }
+                            }
+                        }
+                    } catch (err) { logger_1.gameLogger.error("Error Mongo:", err); }
+                    break;
+
                 case 'AUTO_START_GAME': 
                     if (this.state.queue.length >= 5 && this.state.phase === types_1.GamePhase.WAITING) {
                         this.applyTransition((0, state_machine_1.transition)(this.state, { type: 'START_GAME', footballers: this.footballers }));
@@ -231,6 +231,23 @@ handlePlayerLeave(player) {
         }
     }
 
+    async setupGameField() {
+        if (!this.state.currentRound) return;
+        const ids = this.state.currentRound.clueOrder;
+        try {
+            await this.adapter.stopGame();
+            const all = await this.adapter.getPlayerList();
+            for (const p of all) if (p.id !== 0) await this.adapter.setPlayerTeam(p.id, 0);
+            for (const id of ids) await this.adapter.setPlayerTeam(id, 1);
+            await this.adapter.startGame();
+            setTimeout(() => {
+                ids.forEach((id, i) => {
+                    this.adapter.setPlayerDiscProperties(id, { x: SEAT_POSITIONS[i].x, y: SEAT_POSITIONS[i].y, xspeed: 0, yspeed: 0 });
+                });
+            }, 500);
+        } catch (e) { logger_1.gameLogger.error("Field Error:", e); }
+    }
+
     containsSpoiler(clue, foot) {
         if (!foot) return false;
         const n = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -238,12 +255,11 @@ handlePlayerLeave(player) {
         return n(foot).split(/\s+/).some(p => p.length > 2 && c.includes(p));
     }
 
-   setPhaseTimer(sec) {
+    setPhaseTimer(sec) {
         this.clearPhaseTimer();
         this.phaseTimer = setTimeout(() => {
             if (this.state.phase === types_1.GamePhase.CLUES) {
                 const currentGiverId = this.state.currentRound?.clueOrder[this.state.currentRound.currentClueIndex];
-                
                 this.adapter.getPlayerList().then(players => {
                     const online = players.find(p => p.id === currentGiverId);
                     if (!online) {
@@ -255,7 +271,6 @@ handlePlayerLeave(player) {
                 });
                 return;
             }
-            
             let type = null;
             if (this.state.phase === types_1.GamePhase.DISCUSSION) type = 'END_DISCUSSION';
             else if (this.state.phase === types_1.GamePhase.VOTING) type = 'END_VOTING';
