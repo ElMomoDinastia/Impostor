@@ -75,7 +75,7 @@ function transition(state, action) {
 
        case 'JOIN_QUEUE':
             if (state.queue.includes(action.playerId)) return { state, sideEffects: [] };
-                        if (state.currentRound?.clueOrder.includes(action.playerId)) {
+            if (state.currentRound?.clueOrder.includes(action.playerId)) {
                 return { 
                     state, 
                     sideEffects: [{ type: 'ANNOUNCE_PRIVATE', playerId: action.playerId, message: '❌ Ya estás jugando la ronda actual.' }] 
@@ -88,7 +88,7 @@ function transition(state, action) {
             
             const message = playerPosition <= 5 && state.phase === types_1.GamePhase.WAITING
                 ? `✅ @${playerName} anotado (${playerPosition}/5)`
-                : `⏳ @${playerName} en espera (Posición: ${state.phase === types_1.GamePhase.WAITING ? playerPosition : playerPosition})`;
+                : `⏳ @${playerName} en espera (Posición: ${playerPosition})`;
 
             return { 
                 state: { ...state, queue: updatedQueue }, 
@@ -251,7 +251,7 @@ function handleEndVoting(state) {
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
             sideEffects: [
                 { type: 'CLEAR_TIMER' },
-                { type: 'MOVE_TO_SPECT', playerId: votedOutId }, // <--- Sacamos al impostor al final
+                { type: 'MOVE_TO_SPECT', playerId: votedOutId },
                 { type: 'ANNOUNCE_PUBLIC', message: `━━━━━━━━━━━━━━━━━━━━━━━━` },
                 { type: 'ANNOUNCE_PUBLIC', message: `🎯 ¡LO CAZARON! ${votedName} ERA EL IMPOSTOR`, style: { color: 0x00FF00, fontWeight: "bold" } },
                 { type: 'ANNOUNCE_PUBLIC', message: `🏆 ¡VICTORIA PARA LOS INOCENTES!`, style: { color: 0x00FF00, fontWeight: "bold" } },
@@ -270,7 +270,7 @@ function handleEndVoting(state) {
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
             sideEffects: [
                 { type: 'CLEAR_TIMER' },
-                { type: 'MOVE_TO_SPECT', playerId: votedOutId }, // <--- Sacamos al inocente que perdió la partida
+                { type: 'MOVE_TO_SPECT', playerId: votedOutId },
                 { type: 'ANNOUNCE_PUBLIC', message: `━━━━━━━━━━━━━━━━━━━━━━━━` },
                 { type: 'ANNOUNCE_PUBLIC', message: `💀 ¡GAME OVER! GANÓ EL IMPOSTOR (${impName})`, style: { color: 0xFF0000, fontWeight: "bold" } },
                 { type: 'ANNOUNCE_PUBLIC', message: `❌ ${votedName} ERA INOCENTE.`, style: { color: 0xFFFFFF } },
