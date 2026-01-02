@@ -40,7 +40,7 @@ function loadConfig() {
         
         port: getEnvNumber('PORT', 3000),
         logLevel: process.env.LOG_LEVEL || 'info',
-        clueTime: getEnvNumber('CLUE_TIME', 15),
+        clueTime: getEnvNumber('CLUE_TIME', 20),
         discussionTime: getEnvNumber('DISCUSSION_TIME', 30),
         votingTime: getEnvNumber('VOTING_TIME', 20),
         isProduction: process.env.NODE_ENV === 'production',
