@@ -131,7 +131,7 @@ class HBRoomAdapter {
             return;
         try {
             const stadiumJson = JSON.stringify({
-                "name": "Mesa Impostor Teleese",
+                "name": "Mesa Impostor by Teleese",
                 "width": 400,
                 "height": 400,
                 "spawnDistance": 0,
