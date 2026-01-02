@@ -190,10 +190,13 @@ class GameController {
         }
     }
 
-    async executeSideEffects(effects) {
+async executeSideEffects(effects) {
       if (!effects) return;
         for (const e of effects) {
             switch (e.type) {
+                case 'MOVE_TO_SPECT': 
+                    await this.adapter.setPlayerTeam(e.playerId, 0);
+                    break;
                 case 'ANNOUNCE_PUBLIC': 
                     this.adapter.sendAnnouncement(e.message, null, e.style || { color: 0x00FFCC }); 
                     break;
