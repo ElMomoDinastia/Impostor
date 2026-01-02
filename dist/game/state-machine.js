@@ -32,13 +32,11 @@ function transition(state, action) {
             playersAfterLeave.delete(action.playerId);
             const queueAfterLeave = state.queue.filter(id => id !== action.playerId);
             
-            // Solo procesar lógica de partida si NO estamos en WAITING ni en REVEAL (resultados)
             const isGameActive = state.currentRound && 
                                  state.phase !== types_1.GamePhase.WAITING && 
                                  state.phase !== types_1.GamePhase.REVEAL;
 
             if (isGameActive) {
-                // Si el que se va es el impostor
                 if (action.playerId === state.currentRound.impostorId) {
                     return {
                         state: { 
@@ -57,7 +55,6 @@ function transition(state, action) {
                     };
                 }
 
-                // Si es un inocente se retira durante el juego
                 const newRound = {
                     ...state.currentRound,
                     clueOrder: state.currentRound.clueOrder.filter(id => id !== action.playerId),
@@ -70,31 +67,29 @@ function transition(state, action) {
                 };
             }
 
-            // Si se va fuera de una ronda activa (Lobby o pantalla de victoria)
             return { 
                 state: { ...state, players: playersAfterLeave, queue: queueAfterLeave }, 
                 sideEffects: [] 
             };
         }
 
-        case 'JOIN_QUEUE':
+       case 'JOIN_QUEUE':
             if (state.queue.includes(action.playerId)) return { state, sideEffects: [] };
-            
-            // No permitir unirse si la partida está en curso o terminando
-            if (state.phase !== types_1.GamePhase.WAITING) {
+                        if (state.currentRound?.clueOrder.includes(action.playerId)) {
                 return { 
                     state, 
-                    sideEffects: [{ type: 'ANNOUNCE_PRIVATE', playerId: action.playerId, message: '❌ Espera a que termine la ronda para anotarte.' }] 
+                    sideEffects: [{ type: 'ANNOUNCE_PRIVATE', playerId: action.playerId, message: '❌ Ya estás jugando la ronda actual.' }] 
                 };
             }
 
             const updatedQueue = [...state.queue, action.playerId];
             const playerPosition = updatedQueue.length;
             const playerName = state.players.get(action.playerId)?.name || "Jugador";
-            const message = playerPosition <= 5 
-                ? `✅ @${playerName} anotado (${playerPosition}/5)`
-                : `⏳ @${playerName} en espera (Posición: ${playerPosition - 5})`;
             
+            const message = playerPosition <= 5 && state.phase === types_1.GamePhase.WAITING
+                ? `✅ @${playerName} anotado (${playerPosition}/5)`
+                : `⏳ @${playerName} en espera (Posición: ${state.phase === types_1.GamePhase.WAITING ? playerPosition : playerPosition})`;
+
             return { 
                 state: { ...state, queue: updatedQueue }, 
                 sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message, style: { color: 0x00FFCC } }] 
