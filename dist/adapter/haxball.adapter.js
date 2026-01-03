@@ -53,7 +53,6 @@ class HBRoomAdapter {
             this.page = await this.browser.newPage();
             await this.page.setViewport({ width: 1280, height: 720 });
 
-            // Captura de logs del navegador (como tenías en el original)
             this.page.on('console', (msg) => {
                 const text = msg.text();
                 if (text.includes('[HaxBall]')) {
@@ -64,19 +63,22 @@ class HBRoomAdapter {
             await this.page.goto(HAXBALL_HEADLESS_URL, { waitUntil: 'networkidle2', timeout: 30000 });
             await this.page.waitForFunction('typeof HBInit === "function"', { timeout: 30000 });
 
-            const roomNumber = this.config.roomNumber || 0;
-            const isDecorativo = this.config.isHeader || this.config.isFooter;
+            // --- CORRECCIÓN DE VARIABLES DINÁMICAS ---
+            const roomNumber = parseInt(this.config.roomNumber) || 0;
+            const isHeader = String(this.config.isHeader) === 'true';
+            const isFooter = String(this.config.isFooter) === 'true';
+            const isDecorativo = isHeader || isFooter;
             
-            // Lógica de nombres Teleese Project
+            // --- NOMBRES OPTIMIZADOS (No se cortan en el buscador) ---
             let finalName = "";
-            if (this.config.isHeader) {
-                finalName = "◢◤━━━━━━━  𝙏𝙀𝙇𝙀𝙀𝙎𝙀 𝙋𝙍𝙊𝙅𝙀𝘾𝙏  ━━━━━━━◥◣";
-            } else if (this.config.isFooter) {
-                finalName = "◥◣━━━━━━  ᴅsᴄ.ɢɢ/ᴄʜɪɴᴏᴄɪᴛʏ  ━━━━━━◢◤";
+            if (isHeader) {
+                finalName = "◢◤  𝙏𝙀𝙇𝙀𝙀𝙎𝙀 𝙋𝙍𝙊𝙅𝙀𝘾𝙏  ◥◣";
+            } else if (isFooter) {
+                finalName = "◥◣  ᴅsᴄ.ɢɢ/ᴄʜɪɴᴏᴄɪᴛʏ  ◢◤";
             } else {
-                const fancyNums = ["", "𝟬𝟭", "𝟬𝟮", "𝟬𝟯", "𝟬𝟰", "𝟬𝟱", "𝟬𝟲"];
+                const fancyNums = ["𝟬𝟬", "𝟬𝟭", "𝟬𝟮", "𝟬𝟯", "𝟬𝟰", "𝟬𝟱", "𝟬𝟲", "𝟬𝟳"];
                 const n = fancyNums[roomNumber] || roomNumber;
-                finalName = `▌  🔴   »  「 𝙄𝙈𝙋𝙊𝙎𝙏𝙊𝙍 」  𝙎-${n}  «  ▐`;
+                finalName = `🔴 » 「𝙄𝙈𝙋𝙊𝙎𝙏𝙊𝙍」 𝙎-${n} « ▐`;
             }
 
             const roomConfig = {
@@ -89,6 +91,7 @@ class HBRoomAdapter {
                 geo: { "code": "ar", "lat": -34.501, "lon": -58.442 - (roomNumber * 0.0002) }
             };
 
+            // PASAMOS roomConfig e isDecorativo explícitamente al navegador
             const roomLink = await this.page.evaluate(async (config, isDeco) => {
                 return new Promise((resolve, reject) => {
                     try {
@@ -115,7 +118,7 @@ class HBRoomAdapter {
                             return false;
                         };
 
-                        setTimeout(() => reject(new Error('HaxBall no devolvió el link (Timeout)')), 55000);
+                        setTimeout(() => reject(new Error('HaxBall Timeout')), 55000);
                     } catch (err) { reject(err); }
                 });
             }, roomConfig, isDecorativo);
@@ -137,8 +140,6 @@ class HBRoomAdapter {
             throw error;
         }
     }
-
-    // --- MÉTODOS DE INTERACCIÓN RECUPERADOS Y COMPLETOS ---
 
     async loadDefaultStadium() {
         if (!this.page) return;
@@ -178,9 +179,8 @@ class HBRoomAdapter {
         }, 100);
     }
 
-    // Estas funciones son las que el GameController llama constantemente:
     async sendChat(msg, id) { await this.page?.evaluate((m, i) => window.__haxRoom?.sendChat(m, i), msg, id); }
-    async sendAnnouncement(msg, tid, opts) { await this.page?.evaluate((m, t, o) => window.__haxRoom?.sendAnnouncement(m, t, o?.color, o?.style, o?.sound), msg, tid, opts); }
+    async sendAnnouncement(msg, tid, opts) { await this.page?.evaluate((m, t, o) => window.__haxRoom?.sendAnnouncement(m, t, o?.color, o?.fontWeight || o?.style, o?.sound), msg, tid, opts); }
     async kickPlayer(id, r, b) { await this.page?.evaluate((i, r, b) => window.__haxRoom?.kickPlayer(i, r, b), id, r, b); }
     async setPlayerAdmin(id, a) { await this.page?.evaluate((i, a) => window.__haxRoom?.setPlayerAdmin(i, a), id, a); }
     async setPlayerTeam(id, t) { await this.page?.evaluate((i, team) => window.__haxRoom?.setPlayerTeam(i, team), id, t); }
