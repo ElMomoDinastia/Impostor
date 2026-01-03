@@ -71,20 +71,20 @@ class HBRoomAdapter {
             
            let finalName = "";
 
-          if (isHeader) {
-              finalName = "▌ ◢◤━ 𝐓𝐄𝐋𝐄𝐄𝐒𝐄 𝐏𝐑𝐎𝐉𝐄𝐂𝐓 ━◥◣ ▐";
-                } 
-            else if (isFooter) {
-              finalName = "▌ ◥◣━ dsc.gg/chinocity ━◢◤ ▐";
-            }
-
-            else {
-            const fancyNums = ["𝟬𝟬", "𝟬𝟭", "𝟬𝟮", "𝟬𝟯", "𝟬𝟰", "𝟬𝟱", "𝟬𝟲", "𝟬𝟳"];
-            const n = fancyNums[roomNumber] ?? roomNumber.toString().padStart(2, "0");
-            finalName = `▌   »  𝐈𝐌𝐏𝐎𝐒𝐓𝐎𝐑 ${n}  «   ▐`;
-            }
-
-            const roomConfig = {
+        if (isHeader) {
+        finalName = "▌ ◢◤━ 𝐓𝐄𝐋𝐄𝐄𝐒𝐄 𝐏𝐑𝐎𝐉𝐄𝐂𝐓 ━◥◣ ▐";
+        } 
+        else if (isFooter) {
+            finalName = "▌ ◥◣━ dsc.gg/chinocity ━◢◤ ▐";
+        } 
+        else {
+    const fancyNums = ["𝟬𝟬", "𝟬𝟭", "𝟬𝟮", "𝟬𝟯", "𝟬𝟰", "𝟬𝟱", "𝟬𝟲", "𝟬𝟳"];
+    const n = fancyNums[roomNumber] ?? roomNumber.toString().padStart(2, "0");
+    
+    // Usamos los mismos ◢◤ y el ━ para que ocupen lo mismo
+    finalName = `▌ ◢◤━  𝐈𝐌𝐏𝐎𝐒𝐓𝐎𝐑 ${n}  ━◥◣ ▐`;
+}
+                const roomConfig = {
                 roomName: finalName,
                 maxPlayers: isDecorativo ? 2 : (this.config.maxPlayers || 15),
                 noPlayer: false,
