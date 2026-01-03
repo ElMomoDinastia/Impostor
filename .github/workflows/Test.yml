@@ -1,4 +1,4 @@
-name: Deploy 11 HaxBall Rooms
+name: Deploy Teleese Project Rooms
 
 on:
   push:
@@ -9,11 +9,9 @@ jobs:
   deploy-room:
     runs-on: ubuntu-latest
     strategy:
-      # Si una sala falla por token expirado, las otras 10 siguen funcionando
       fail-fast: false 
       matrix:
-        # Esto crea los 11 procesos paralelos
-        room_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,]
+        room_id: [0, 1, 2, 3, 4, 5, 6, 7]
 
     steps:
       - name: Checkout del código
@@ -28,20 +26,18 @@ jobs:
       - name: Instalar dependencias
         run: |
           npm install
-          # Forzamos la instalación de los plugins de stealth por seguridad
-          npm install puppeteer-extra puppeteer-extra-plugin-stealth
-
-      - name: Instalar dependencias de Chrome (Linux)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgbm-dev wget gnupg
-          # Instalamos el binario de Chrome necesario para Puppeteer
           npx puppeteer install
 
-      - name: Ejecutar Sala #${{ matrix.room_id }}
+      - name: Ejecutar Sala 
         env:
           ROOM_ID: ${{ matrix.room_id }}
+          
+          # Lógica para activar Header o Footer basado en el ID
+          IS_HEADER: ${{ matrix.room_id == 0 && 'true' || 'false' }}
+          IS_FOOTER: ${{ matrix.room_id == 7 && 'true' || 'false' }}
+          
           HAXBALL_TOKEN: ${{ secrets[format('TOKEN_{0}', matrix.room_id)] }}
+          
           NODE_ENV: production
           MONGO_URI: ${{ secrets.MONGO_URI }} 
         run: |
