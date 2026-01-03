@@ -57,13 +57,17 @@ function transition(state, action) {
 
             if (isGameActive) {
                 if (action.playerId === state.currentRound.impostorId) {
+                    const winners = state.currentRound.normalPlayerIds.filter(id => id !== action.playerId);
                     return {
                         state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, phase: types_1.GamePhase.REVEAL },
                         sideEffects: [
                             { type: 'CLEAR_TIMER' },
                             { type: 'ANNOUNCE_PUBLIC', message: `🏃 ${s('ᴇʟ ɪᴍᴘᴏꜱᴛᴏʀ ʜᴀ ᴀʙᴀɴᴅᴏɴᴀᴅᴏ ʟᴀ ᴘᴀʀᴛɪᴅᴀ')}...` },
                             { type: 'ANNOUNCE_PUBLIC', message: `🏆 ${s('ᴠɪᴄᴛᴏʀɪᴀ ᴘᴀʀᴀ ʟᴏꜱ ɪɴᴏᴄᴇɴᴛᴇꜱ')}`, style: { color: 0x00FF00, fontWeight: 'bold' } },
-                            { type: 'UPDATE_STATS', winnerRole: 'INOCENTE', winners: state.currentRound.normalPlayerIds.filter(id => id !== action.playerId) },
+                            { 
+                                type: 'UPDATE_STATS', 
+                                payload: { winners, losers: [action.playerId], winnerRole: 'CIVIL' } 
+                            },
                             { type: 'SET_PHASE_TIMER', durationSeconds: 5, nextAction: 'RESET_GAME' }
                         ]
                     };
@@ -259,6 +263,7 @@ function handleEndVoting(state) {
     const isImpostor = votedOutId === round.impostorId;
     const votedName = (state.players.get(votedOutId)?.name || "Alguien").toUpperCase();
 
+    // VICTORIA CIVILES: El Impostor es votado
     if (isImpostor) {
         return { 
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
@@ -269,7 +274,14 @@ function handleEndVoting(state) {
                 { type: 'ANNOUNCE_PUBLIC', message: `🎯 ¡${s('ʟᴏ ᴄᴀᴢᴀʀᴏɴ')}! ${votedName} ${s('ᴇʀᴀ ᴇʟ ɪᴍᴘᴏꜱᴛᴏʀ')}`, style: { color: 0x00FF00, fontWeight: "bold" } },
                 { type: 'ANNOUNCE_PUBLIC', message: `🏆 ¡${s('ᴠɪᴄᴛᴏʀɪᴀ ᴘᴀʀᴀ ʟᴏꜱ ɪɴᴏᴄᴇɴᴛᴇꜱ')}!`, style: { color: 0x00FF00, fontWeight: "bold" } },
                 { type: 'ANNOUNCE_PUBLIC', message: BORDER },
-                { type: 'UPDATE_STATS', winnerRole: 'INOCENTE', winners: round.clueOrder.filter(id => id !== round.impostorId) },
+                { 
+                    type: 'UPDATE_STATS', 
+                    payload: { 
+                        winners: round.normalPlayerIds, 
+                        losers: [round.impostorId], 
+                        winnerRole: 'CIVIL' 
+                    } 
+                },
                 { type: 'SET_PHASE_TIMER', durationSeconds: 7, nextAction: 'RESET_GAME' }
             ] 
         };
@@ -277,6 +289,7 @@ function handleEndVoting(state) {
 
     const remainingInnocents = round.normalPlayerIds.filter(id => id !== votedOutId);
     
+    // VICTORIA IMPOSTOR: Queda solo 1 inocente
     if (remainingInnocents.length <= 1) {
         const impName = (state.players.get(round.impostorId)?.name || "Impostor").toUpperCase();
         return { 
@@ -288,12 +301,20 @@ function handleEndVoting(state) {
                 { type: 'ANNOUNCE_PUBLIC', message: `💀 ¡${s('ɢᴀᴍᴇ ᴏᴠᴇʀ')}! ${s('ɢᴀɴᴏ ᴇʟ ɪᴍᴘᴏꜱᴛᴏʀ')} (${impName})`, style: { color: 0xFF0000, fontWeight: "bold" } },
                 { type: 'ANNOUNCE_PUBLIC', message: `❌ ${votedName} ${s('ᴇʀᴀ ɪɴᴏᴄᴇɴᴛᴇ')}.`, style: { color: 0xFFFFFF } },
                 { type: 'ANNOUNCE_PUBLIC', message: BORDER },
-                { type: 'UPDATE_STATS', winnerRole: 'IMPOSTOR', winners: [round.impostorId] },
+                { 
+                    type: 'UPDATE_STATS', 
+                    payload: { 
+                        winners: [round.impostorId], 
+                        losers: round.normalPlayerIds, 
+                        winnerRole: 'IMPOSTOR' 
+                    } 
+                },
                 { type: 'SET_PHASE_TIMER', durationSeconds: 7, nextAction: 'RESET_GAME' }
             ] 
         };
     }
 
+    // EL JUEGO SIGUE: El votado era inocente pero quedan más de 1
     const nextClueOrder = round.clueOrder.filter(id => id !== votedOutId);
     const firstPlayerName = (state.players.get(nextClueOrder[0])?.name || "---").toUpperCase();
 
