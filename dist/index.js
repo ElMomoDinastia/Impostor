@@ -17,11 +17,9 @@ let healthServer = null;
 async function main() {
     logger_1.logger.info({ config: (0, config_1.getPublicConfig)() }, 'Starting HaxBall Impostor Game...');
 
-    // 1. CONEXIÓN A MONGODB (Usando el Secret MONGO_URI)
     const mongoURI = process.env.MONGO_URI || config_1.config.mongoUri;
     if (mongoURI) {
         try {
-            // Ponemos un timeout para que no se quede colgado si la IP no está en whitelist
             await mongoose_1.default.connect(mongoURI, { serverSelectionTimeoutMS: 5000 });
             global.db = mongoose_1.default.connection;
             logger_1.logger.info('✅ Conectado a MongoDB Atlas con éxito');
@@ -45,7 +43,7 @@ async function main() {
     };
 
     const adapter = (0, haxball_adapter_1.createHBRoomAdapter)(roomConfig);
-    gameController = new controller_1.GameController(adapter);
+    gameController = new controller_1.GameController(adapter, null, mongoose_1.default.connection);
 
     // 3. HEALTH SERVER
     healthServer = new server_1.HealthServer(() => ({
