@@ -82,7 +82,7 @@ class HBRoomAdapter {
     const n = fancyNums[roomNumber] ?? roomNumber.toString().padStart(2, "0");
     
     // Usamos los mismos ◢◤ y el ━ para que ocupen lo mismo
-    finalName = `▌ ◢◤━  𝐈𝐌𝐏𝐎𝐒𝐓𝐎𝐑 ${n}  ━◥◣ ▐`;
+    finalName = `▌  ┃ ━   𝐈𝐌𝐏𝐎𝐒𝐓𝐎𝐑 ${n}   ━ ┃  ▐`;
 }
                 const roomConfig = {
                 roomName: finalName,
