@@ -124,29 +124,47 @@ class HBRoomAdapter {
     async setTeamsLock(l) { await this.page?.evaluate((locked) => window.__haxRoom?.setTeamsLock(locked), l); }
     async setPlayerAdmin(id, a) { await this.page?.evaluate((i, a) => window.__haxRoom?.setPlayerAdmin(i, a), id, a); }
 
-async loadDefaultStadium() {
-        const stadium = JSON.stringify({
-            "name": "Mesa Impostor by Teleese", "width": 450, "height": 450,
-            "bg": { "type": "grass", "width": 450, "height": 450, "kickOffRadius": 0 },
-            "discs": [
-    { "pos": [0, -130], "radius": 25, "invMass": 0, "color": "transparent", "cGroup": ["wall"], "cMask": ["all"], "bCoef": 0 },
-    { "pos": [124, -40], "radius": 25, "invMass": 0, "color": "transparent", "cGroup": ["wall"], "cMask": ["all"], "bCoef": 0 },
-    { "pos": [76, 105], "radius": 25, "invMass": 0, "color": "transparent", "cGroup": ["wall"], "cMask": ["all"], "bCoef": 0 },
-    { "pos": [-76, 105], "radius": 25, "invMass": 0, "color": "transparent", "cGroup": ["wall"], "cMask": ["all"], "bCoef": 0 },
-    { "pos": [-124, -40], "radius": 25, "invMass": 0, "color": "transparent", "cGroup": ["wall"], "cMask": ["all"], "bCoef": 0 },
-    
-    { "pos": [0, 0], "radius": 65, "invMass": 0, "color": "2D3748", "cGroup": ["wall"], "cMask": ["all"], "bCoef": 0 }
-            ],
-            "planes": [
-                { "normal": [0, 1], "dist": -200, "bCoef": 0, "cMask": ["all"] },
-                { "normal": [0, -1], "dist": -200, "bCoef": 0, "cMask": ["all"] },
-                { "normal": [1, 0], "dist": -200, "bCoef": 0, "cMask": ["all"] },
-                { "normal": [-1, 0], "dist": -200, "bCoef": 0, "cMask": ["all"] }
-            ],
-            "spawnDistance": 0, "spawns": [{ "x": 0, "y": 0, "team": "red" }], "balls": []
-        });
-        await this.page?.evaluate((s) => window.__haxRoom?.setCustomStadium(s), stadium);
-    }
+ async loadDefaultStadium() {
+        if (!this.page)
+            return;
+        try {
+            const stadiumJson = JSON.stringify({
+                "name": "Mesa Impostor by Teleese",
+                "width": 400,
+                "height": 400,
+                "spawnDistance": 0,
+                "bg": { "type": "grass", "width": 400, "height": 400, "kickOffRadius": 0 },
+                "playerPhysics": {
+                    "radius": 15,
+                    "acceleration": 0,
+                    "kickingAcceleration": 0,
+                    "kickStrength": 12,
+                    "damping": 0.96,
+                    "invMass": 0.5,
+                    "kickingDamping": 0.96
+                },
+                "ballPhysics": { "radius": 10, "invMass": 0.5, "damping": 0.99, "color": "FFFFFF" },
+                "vertexes": [],
+                "segments": [],
+                "discs": [
+                    { "pos": [0, -130], "radius": 30, "invMass": 0, "color": "transparent", "cGroup": ["c0"], "cMask": ["ball"] },
+                    { "pos": [124, -40], "radius": 30, "invMass": 0, "color": "transparent", "cGroup": ["c0"], "cMask": ["ball"] },
+                    { "pos": [76, 105], "radius": 30, "invMass": 0, "color": "transparent", "cGroup": ["c0"], "cMask": ["ball"] },
+                    { "pos": [-76, 105], "radius": 30, "invMass": 0, "color": "transparent", "cGroup": ["c0"], "cMask": ["ball"] },
+                    { "pos": [-124, -40], "radius": 30, "invMass": 0, "color": "transparent", "cGroup": ["c0"], "cMask": ["ball"] },
+                    { "pos": [0, 0], "radius": 35, "invMass": 0, "color": "2D3748", "cGroup": ["wall"], "cMask": ["all"] }
+                ],
+                "planes": [
+                    { "normal": [0, 1], "dist": -400, "cMask": ["all"] },
+                    { "normal": [0, -1], "dist": -400, "cMask": ["all"] },
+                    { "normal": [1, 0], "dist": -400, "cMask": ["all"] },
+                    { "normal": [-1, 0], "dist": -400, "cMask": ["all"] }
+                ],
+                "goals": [],
+                "spawns": [{ "x": 0, "y": 0, "team": "red" }],
+                "balls": [{ "pos": [0, 0], "color": "FFFFFF" }],
+                "traits": {}
+            });
 
     startEventPolling() {
         this.pollingInterval = setInterval(async () => {
