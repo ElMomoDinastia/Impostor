@@ -79,10 +79,6 @@ function transition(state, action) {
                     normalPlayerIds: state.currentRound.normalPlayerIds.filter(id => id !== action.playerId)
                 };
 
-                return { 
-                    state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, currentRound: newRound }, 
-                    sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message: `⚠️ ${s('ᴜɴ ɪɴᴏᴄᴇɴᴛᴇ ꜱᴇ ʜᴀ ɪᴅᴏ')}.` }] 
-                };
             }
 
             return { 
