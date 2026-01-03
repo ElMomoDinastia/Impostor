@@ -52,22 +52,25 @@
     
     /* ───────────── CONTROLLER ───────────── */
     
-    class GameController {
-      constructor(adapter, footballers) {
-        this.adapter = adapter;
-    
-        this.state = (0, types_1.createInitialState)({
-          clueTimeSeconds: config_1.config.clueTime,
-          discussionTimeSeconds: config_1.config.discussionTime,
-          votingTimeSeconds: config_1.config.votingTime,
-        });
-    
-        this.footballers = footballers ?? footballers_json_1.default;
-        this.phaseTimer = null;
-        this.assignDelayTimer = null;
-    
-        this.setupEventHandlers();
-      }
+   /* ───────────── CONTROLLER ───────────── */
+
+class GameController {
+  constructor(adapter, footballers, dbConnection) { // <--- Agregamos dbConnection
+    this.adapter = adapter;
+    this.db = dbConnection; // <--- Guardamos la conexión
+
+    this.state = (0, types_1.createInitialState)({
+      clueTimeSeconds: config_1.config.clueTime,
+      discussionTimeSeconds: config_1.config.discussionTime,
+      votingTimeSeconds: config_1.config.votingTime,
+    });
+
+    this.footballers = footballers ?? footballers_json_1.default;
+    this.phaseTimer = null;
+    this.assignDelayTimer = null;
+
+    this.setupEventHandlers();
+  }
     
       /* ───────────── EVENTS ───────────── */
     
@@ -595,17 +598,75 @@
     }
   }
 
+ /* ───────────── DB & MISIONES REALES ───────────── */
+
   async getPlayerStats(auth, name) {
+    try {
+      // Si no hay DB, devolvemos un objeto temporal
+      if (!this.db || this.db.readyState !== 1) {
+        return { auth, name, wins: 0, losses: 0, xp: 0, missionLevel: 1, missionProgress: 0 };
+      }
+
+      const collection = this.db.collection('players');
+      let stats = await collection.findOne({ auth });
+
+      if (!stats) {
+        stats = { 
+          auth, 
+          name, 
+          wins: 0, 
+          losses: 0, 
+          xp: 0, 
+          missionLevel: 1, 
+          missionProgress: 0,
+          updatedAt: new Date() 
+        };
+        await collection.insertOne(stats);
+      } else {
+        // Actualizamos el nombre por si se lo cambió en Haxball
+        await collection.updateOne({ auth }, { $set: { name, updatedAt: new Date() } });
+      }
+      return stats;
+    } catch (e) {
+      logger_1.gameLogger.error("Error en getPlayerStats:", e);
       return { auth, name, wins: 0, losses: 0, xp: 0, missionLevel: 1, missionProgress: 0 };
+    }
+  }
+
+  async savePlayerStatsToMongo(auth, stats) {
+    try {
+      if (!this.db || this.db.readyState !== 1) return;
+      await this.db.collection('players').updateOne(
+        { auth }, 
+        { $set: { ...stats, updatedAt: new Date() } }, 
+        { upsert: true }
+      );
+    } catch (e) {
+      logger_1.gameLogger.error("Error en savePlayerStatsToMongo:", e);
+    }
   }
 
   async getTopPlayers(limit) {
-      return [{ name: "Teleese", xp: 1000 }];
+    try {
+      if (!this.db || this.db.readyState !== 1) return [{ name: "Sin DB", xp: 0 }];
+      return await this.db.collection('players')
+        .find({})
+        .sort({ xp: -1 })
+        .limit(limit)
+        .toArray();
+    } catch (e) {
+      return [];
+    }
   }
 
-
   async savePlayerLogToMongo(payload) {
-    logger_1.gameLogger.info(`Log: ${payload.name} ingresó.`);
+    try {
+      if (this.db && this.db.readyState === 1) {
+        await this.db.collection('logs').insertOne({ ...payload, timestamp: new Date() });
+      }
+    } catch (e) {
+      logger_1.gameLogger.error("Error guardando log:", e);
+    }
   }
 
   async setupGameField() {
