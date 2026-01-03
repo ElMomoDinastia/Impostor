@@ -1,9 +1,11 @@
-name: Deploy Teleese Project Rooms
+name: Teleese 24/7 Keep-Alive
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
 
 jobs:
   deploy-room:
@@ -11,6 +13,7 @@ jobs:
     strategy:
       fail-fast: false 
       matrix:
+        # 8 salas: Header(0), Salas(1-6), Footer(7)
         room_id: [0, 1, 2, 3, 4, 5, 6, 7]
 
     steps:
@@ -28,17 +31,25 @@ jobs:
           npm install
           npx puppeteer install
 
-      - name: Ejecutar Sala 
+      - name: Ejecutar y Programar Relevo
         env:
           ROOM_ID: ${{ matrix.room_id }}
-          
-          # Lógica para activar Header o Footer basado en el ID
           IS_HEADER: ${{ matrix.room_id == 0 && 'true' || 'false' }}
           IS_FOOTER: ${{ matrix.room_id == 7 && 'true' || 'false' }}
-          
           HAXBALL_TOKEN: ${{ secrets[format('TOKEN_{0}', matrix.room_id)] }}
-          
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
           NODE_ENV: production
-          MONGO_URI: ${{ secrets.MONGO_URI }} 
         run: |
-          npm start
+          # 1. Programamos que a los 20400 seg (5h 40m) se dispare un NUEVO workflow
+          # Esto le da tiempo al nuevo workflow de instalar todo antes de que este muera
+          (sleep 20400 && curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/${{ github.workflow }}/dispatches \
+            -d '{"ref":"main"}') &
+          
+          # 2. Ejecutamos la sala con un timeout de 5 horas y 55 minutos
+          # Esto mata el proceso justo antes de que GitHub lo haga por la fuerza,
+          # permitiendo que el token quede libre para el workflow que acaba de nacer.
+          timeout 21300s npm start || true
