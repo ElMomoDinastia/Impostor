@@ -150,12 +150,60 @@ class GameController {
     }
   }
 
-  /* ───────────── CHAT ───────────── */
-
-  handlePlayerChat(player, message) {
+handlePlayerChat(player, message) {
     const msg = message.trim();
     const msgLower = msg.toLowerCase();
     const isPlaying = this.isPlayerInRound(player.id);
+
+    if (msgLower === "!help") {
+      this.adapter.sendAnnouncement("▌ ◢◤━  𝐀𝐘𝐔𝐃𝐀  ━◥◣ ▐", player.id, { color: 0xFFFF00, fontWeight: 'bold' });
+      this.adapter.sendAnnouncement("» !𝐜𝐨𝐦𝐨𝐣𝐮𝐠𝐚𝐫 : 𝐓𝐮𝐭𝐨𝐫𝐢𝐚𝐥 𝐝𝐞𝐥 𝐣𝐮𝐞𝐠𝐨.", player.id);
+      this.adapter.sendAnnouncement("» !𝐩𝐚𝐥𝐚𝐛𝐫𝐚   : 𝐕𝐞𝐫 𝐪𝐮𝐞́ 𝐣𝐮𝐠𝐚𝐝𝐨𝐫 𝐭𝐞 𝐭𝐨𝐜𝐨́.", player.id);
+      this.adapter.sendAnnouncement("» !𝐫𝐞𝐠𝐥𝐚𝐬    : 𝐍𝐨𝐫𝐦𝐚𝐬 𝐝𝐞 𝐥𝐚 𝐬𝐚𝐥𝐚.", player.id);
+      return false;
+    }
+
+    // !comojugar (Adaptado a temática Futbolistas)
+    if (msgLower === "!comojugar") {
+      this.adapter.sendAnnouncement("▌ ◢◤━  ¿𝐂𝐎𝐌𝐎 𝐉𝐔𝐆𝐀𝐑?  ━◥◣ ▐", player.id, { color: 0x00FF00, fontWeight: 'bold' });
+      this.adapter.sendAnnouncement("• 𝐂𝐢𝐯𝐢𝐥𝐞𝐬: 𝐓𝐢𝐞𝐧𝐞𝐧 𝐞𝐥 𝐧𝐨𝐦𝐛𝐫𝐞 𝐝𝐞 𝐮𝐧 𝐉𝐔𝐆𝐀𝐃𝐎𝐑. 𝐃𝐢𝐠𝐚𝐧 𝐜𝐨𝐬𝐚𝐬 𝐫𝐞𝐥𝐚𝐜𝐢𝐨𝐧𝐚𝐝𝐚𝐬 𝐬𝐢𝐧 𝐫𝐞𝐠𝐚𝐥𝐚𝐫𝐥𝐨.", player.id);
+      this.adapter.sendAnnouncement("• 𝐈𝐦𝐩𝐨𝐬𝐭𝐨𝐫: 𝐍𝐨 𝐬𝐚𝐛𝐞 𝐪𝐮𝐢𝐞́𝐧 𝐞𝐬. 𝐃𝐞𝐛𝐞 𝐟𝐢𝐧𝐠𝐢𝐫 𝐪𝐮𝐞 𝐬𝐢 𝐬𝐚𝐛𝐞 𝐩𝐚𝐫𝐚 𝐧𝐨 𝐬𝐞𝐫 𝐯𝐨𝐭𝐚𝐝𝐨.", player.id);
+      this.adapter.sendAnnouncement("• 𝐎𝐛𝐣𝐞𝐭𝐢𝐯𝐨: 𝐃𝐞𝐬𝐜𝐮𝐛𝐫𝐢𝐫 𝐚𝐥 𝐈𝐦𝐩𝐨𝐬𝐭𝐨𝐫. 𝐒𝐢 𝐞𝐥 𝐈𝐦𝐩𝐨𝐬𝐭𝐨𝐫 𝐚𝐝𝐢𝐯𝐢𝐧𝐚 𝐞𝐥 𝐣𝐮𝐠𝐚𝐝𝐨𝐫, 𝐆𝐀𝐍𝐀.", player.id);
+      return false;
+    }
+
+    // !reglas
+    if (msgLower === "!reglas") {
+      this.adapter.sendAnnouncement("▌ ◢◤━  𝐑𝐄𝐆𝐋𝐀𝐒  ━◥◣ ▐", player.id, { color: 0xFF5555, fontWeight: 'bold' });
+      this.adapter.sendAnnouncement("𝟏. 𝐏𝐫𝐨𝐡𝐢𝐛𝐢𝐝𝐨 𝐝𝐞𝐜𝐢𝐫 𝐞𝐥 𝐧𝐨𝐦𝐛𝐫𝐞 𝐝𝐞𝐥 𝐣𝐮𝐠𝐚𝐝𝐨𝐫 𝐨 𝐬𝐮 𝐜𝐥𝐮𝐛 𝐚𝐜𝐭𝐮𝐚𝐥.", player.id);
+      this.adapter.sendAnnouncement("𝟐. 𝐍𝐨 𝐫𝐞𝐯𝐞𝐥𝐞𝐬 𝐫𝐨𝐥𝐞𝐬 𝐬𝐢 𝐲𝐚 𝐟𝐮𝐢𝐬𝐭𝐞 𝐞𝐥𝐢𝐦𝐢𝐧𝐚𝐝𝐨.", player.id);
+      this.adapter.sendAnnouncement("𝟑. 𝐑𝐞𝐬𝐩𝐞𝐭𝐚́ 𝐞𝐥 𝐭𝐮𝐫𝐧𝐨 𝐝𝐞 𝐩𝐢𝐬𝐭𝐚𝐬 𝐝𝐞 𝐥𝐨𝐬 𝐝𝐞𝐦𝐚́𝐬.", player.id);
+      return false;
+    }
+
+    // !palabra (Ahora muestra el Jugador)
+    if (msgLower === "!palabra") {
+      if (this.state.phase === types_1.GamePhase.IDLE) {
+          this.adapter.sendAnnouncement(`⚠️ ${player.name}, 𝐥𝐚 𝐩𝐚𝐫𝐭𝐢𝐝𝐚 𝐧𝐨 𝐞𝐦𝐩𝐞𝐳𝐨́ 𝐭𝐨𝐝𝐚𝐯𝐢́𝐚.`, player.id, { color: 0xCCCCCC });
+          return false;
+      }
+      if (!isPlaying) {
+          this.adapter.sendAnnouncement(`⚠️ 𝐍𝐨 𝐞𝐬𝐭𝐚́𝐬 𝐩𝐚𝐫𝐭𝐢𝐜𝐢𝐩𝐚𝐧𝐝𝐨 𝐞𝐧 𝐞𝐬𝐭𝐚 𝐫𝐨𝐧𝐝𝐚.`, player.id, { color: 0xCCCCCC });
+          return false;
+      }
+
+      const isImpostor = this.state.currentRound?.impostorId === player.id;
+      const futbolista = this.state.currentRound?.footballer;
+
+      if (isImpostor) {
+        this.adapter.sendAnnouncement(`🕵️ ${player.name}, 𝐍𝐎 𝐭𝐞𝐧𝐞́𝐬 𝐣𝐮𝐠𝐚𝐝𝐨𝐫. ¡𝐒𝐨𝐬 𝐞𝐥 𝐈𝐌𝐏𝐎𝐒𝐓𝐎𝐑! 𝐌𝐞𝐧𝐭𝐢́ 𝐩𝐚𝐫𝐚 𝐠𝐚𝐧𝐚𝐫.`, player.id, { color: 0xFF0000, fontWeight: 'bold' });
+      } else if (futbolista) {
+        this.adapter.sendAnnouncement(`⚽ ${player.name}, 𝐭𝐮 𝐣𝐮𝐠𝐚𝐝𝐨𝐫 𝐞𝐬: ${futbolista.toUpperCase()}`, player.id, { color: 0x00FFFF, fontWeight: 'bold' });
+      }
+      return false;
+    }
+
+    /* --- LÓGICA DE JUEGO EXISTENTE --- */
 
     /* votar skip */
     if (
@@ -304,7 +352,6 @@ class GameController {
 
     return false;
   }
-
   /* ───────────── STATE ───────────── */
 
   applyTransition(result) {
