@@ -419,6 +419,7 @@ class GameController {
       }
 
       await this.adapter.startGame();
+
       setTimeout(() => {
         ids.forEach((id, i) => {
           if (SEAT_POSITIONS[i]) {
@@ -427,12 +428,17 @@ class GameController {
               y: SEAT_POSITIONS[i].y,
               xspeed: 0,
               yspeed: 0,
-              invMass: 0 
+              xgravity: 0,
+              ygravity: 0,
+              invMass: 0,    
+              bCoef: 0,      
+              radius: 15,    
+              cMask: ["all"] 
             });
           }
         });
-        logger_1.gameLogger.info("✅ Jugadores posicionados en la mesa.");
-      }, 600);
+        logger_1.gameLogger.info("✅ Jugadores CONGELADOS en sus asientos.");
+      }, 200);
 
     } catch (e) {
       logger_1.gameLogger.error("❌ Error en setupGameField:", e);
