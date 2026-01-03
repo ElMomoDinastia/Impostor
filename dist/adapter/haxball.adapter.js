@@ -92,8 +92,8 @@ class HBRoomAdapter {
                 password: this.config.password || null,
                 geo: { 
                     "code": "ar", 
-                    "lat": -34.501,
-                    "lon": -58.442 + (roomNumber * 0.01)
+                    "lat": -34.5670013427734,
+                    "lon": -58.4669990539552 + (roomNumber * 0.01)
                 }
             };
 
