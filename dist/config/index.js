@@ -18,8 +18,8 @@ function getEnvNumber(key, defaultValue) {
 
 function loadConfig() {
     const instanceId = getEnvNumber('ROOM_ID', 0); 
-    
-    const haxballToken = process.env.HAXBALL_TOKEN;
+    const dynamicTokenKey = `TOKEN_${instanceId}`;
+    const haxballToken = process.env[dynamicTokenKey] || process.env.HAXBALL_TOKEN;
 
     return {
         roomNumber: instanceId,
