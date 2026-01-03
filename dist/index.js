@@ -30,14 +30,13 @@ async function main() {
         }
     }
 
-    // 2. CONFIGURACIÓN DE LA SALA
     const roomConfig = {
-        roomName: config_1.config.roomName,
-        maxPlayers: config_1.config.maxPlayers,
-        noPlayer: config_1.config.noPlayer,
-        token: config_1.config.haxballToken,
-        public: true,
-        geo: config_1.config.geo
+    roomName: config_1.config.roomName,
+    maxPlayers: config_1.config.maxPlayers,
+    noPlayer: config_1.config.noPlayer,
+    token: config_1.config.token, 
+    public: true,
+    geo: config_1.config.geo
     };
 
     const adapter = (0, haxball_adapter_1.createHBRoomAdapter)(roomConfig);
