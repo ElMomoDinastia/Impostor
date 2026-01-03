@@ -1,17 +1,35 @@
 "use strict";
+
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.transition = transition;
 exports.transitionToClues = transitionToClues;
 
 const types_1 = require("./types");
 
+/**
+ * UTILS: Estética y Formateo
+ */
+const s = (text) => {
+    const map = {
+        'a': 'ᴀ', 'b': 'ʙ', 'c': 'ᴄ', 'd': 'ᴅ', 'e': 'ᴇ', 'f': 'ꜰ', 'g': 'ɢ', 'h': 'ʜ', 'i': 'ɪ', 
+        'j': 'ᴊ', 'k': 'ᴋ', 'l': 'ʟ', 'm': 'ᴍ', 'n': 'ɴ', 'o': 'ᴏ', 'p': 'ᴘ', 'q': 'ǫ', 'r': 'ʀ', 
+        's': 'ꜱ', 't': 'ᴛ', 'u': 'ᴜ', 'v': 'ᴠ', 'w': 'ᴡ', 'x': 'x', 'y': 'ʏ', 'z': 'ᴢ'
+    };
+    return text.toLowerCase().split('').map(char => map[char] || char).join('');
+};
+
+const BORDER = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+
 function shuffle(array) {
     return [...array].sort(() => Math.random() - 0.5);
 }
 
+/**
+ * LÓGICA DE TRANSICIÓN DE ESTADOS
+ */
 function transition(state, action) {
     switch (action.type) {
-        case 'PLAYER_JOIN':
+        case 'PLAYER_JOIN': {
             const newPlayers = new Map(state.players);
             newPlayers.set(action.player.id, {
                 ...action.player,
@@ -23,10 +41,11 @@ function transition(state, action) {
                 sideEffects: [{ 
                     type: 'ANNOUNCE_PRIVATE', 
                     playerId: action.player.id, 
-                    message: '⚽ ¡Bienvenido! Escribe "jugar" para entrar.' 
+                    message: `⭐ ${s('ʙɪᴇɴᴠᴇɴɪᴅᴏ')}! ${s('ᴇꜱᴄʀɪʙᴇ')} "jugar" ${s('ᴘᴀʀᴀ ᴇɴᴛʀᴀʀ ᴀ ʟᴀ ꜰɪʟᴀ')}.` 
                 }] 
             };
-        
+        }
+
         case 'PLAYER_LEAVE': {
             const playersAfterLeave = new Map(state.players);
             playersAfterLeave.delete(action.playerId);
@@ -39,16 +58,11 @@ function transition(state, action) {
             if (isGameActive) {
                 if (action.playerId === state.currentRound.impostorId) {
                     return {
-                        state: { 
-                            ...state, 
-                            players: playersAfterLeave, 
-                            queue: queueAfterLeave, 
-                            phase: types_1.GamePhase.REVEAL 
-                        },
+                        state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, phase: types_1.GamePhase.REVEAL },
                         sideEffects: [
                             { type: 'CLEAR_TIMER' },
-                            { type: 'ANNOUNCE_PUBLIC', message: `🏃 EL IMPOSTOR HA ABANDONADO LA SALA...`, style: { color: 0xFFFF00 } },
-                            { type: 'ANNOUNCE_PUBLIC', message: `🏆 ¡VICTORIA PARA LOS INOCENTES!`, style: { color: 0x00FF00, fontWeight: 'bold' } },
+                            { type: 'ANNOUNCE_PUBLIC', message: `🏃 ${s('ᴇʟ ɪᴍᴘᴏꜱᴛᴏʀ ʜᴀ ᴀʙᴀɴᴅᴏɴᴀᴅᴏ ʟᴀ ᴘᴀʀᴛɪᴅᴀ')}...` },
+                            { type: 'ANNOUNCE_PUBLIC', message: `🏆 ${s('ᴠɪᴄᴛᴏʀɪᴀ ᴘᴀʀᴀ ʟᴏꜱ ɪɴᴏᴄᴇɴᴛᴇꜱ')}`, style: { color: 0x00FF00, fontWeight: 'bold' } },
                             { type: 'UPDATE_STATS', winnerRole: 'INOCENTE', winners: state.currentRound.normalPlayerIds.filter(id => id !== action.playerId) },
                             { type: 'SET_PHASE_TIMER', durationSeconds: 5, nextAction: 'RESET_GAME' }
                         ]
@@ -63,7 +77,7 @@ function transition(state, action) {
 
                 return { 
                     state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, currentRound: newRound }, 
-                    sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message: `⚠️ Un inocente se ha retirado.` }] 
+                    sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message: `⚠️ ${s('ᴜɴ ɪɴᴏᴄᴇɴᴛᴇ ꜱᴇ ʜᴀ ɪᴅᴏ')}.` }] 
                 };
             }
 
@@ -73,32 +87,34 @@ function transition(state, action) {
             };
         }
 
-       case 'JOIN_QUEUE':
+        case 'JOIN_QUEUE': {
             if (state.queue.includes(action.playerId)) return { state, sideEffects: [] };
             if (state.currentRound?.clueOrder.includes(action.playerId)) {
                 return { 
                     state, 
-                    sideEffects: [{ type: 'ANNOUNCE_PRIVATE', playerId: action.playerId, message: '❌ Ya estás jugando la ronda actual.' }] 
+                    sideEffects: [{ type: 'ANNOUNCE_PRIVATE', playerId: action.playerId, message: `❌ ${s('ʏᴀ ᴇꜱᴛᴀꜱ ᴊᴜɢᴀɴᴅᴏ ʟᴀ ʀᴏɴᴅᴀ ᴀᴄᴛᴜᴀʟ')}.` }] 
                 };
             }
 
             const updatedQueue = [...state.queue, action.playerId];
-            const playerPosition = updatedQueue.length;
-            const playerName = state.players.get(action.playerId)?.name || "Jugador";
+            const pos = updatedQueue.length;
+            const name = state.players.get(action.playerId)?.name || "Player";
             
-            const message = playerPosition <= 5 && state.phase === types_1.GamePhase.WAITING
-                ? `✅ @${playerName} anotado (${playerPosition}/5)`
-                : `⏳ @${playerName} en espera (Posición: ${playerPosition})`;
+            const message = pos <= 5 && state.phase === types_1.GamePhase.WAITING
+                ? `✅ @${name.toUpperCase()} ${s('ᴀɴᴏᴛᴀᴅᴏ')} [${pos}/5]`
+                : `⏳ @${name.toUpperCase()} ${s('ᴇɴ ᴇꜱᴘᴇʀᴀ')} [ᴘᴏꜱɪᴄɪᴏɴ: ${pos}]`;
 
             return { 
                 state: { ...state, queue: updatedQueue }, 
                 sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message, style: { color: 0x00FFCC } }] 
             };
+        }
 
         case 'START_GAME': {
             const participants = state.queue.slice(0, 5);
             const impostorId = participants[Math.floor(Math.random() * participants.length)];
             const footballer = action.footballers[Math.floor(Math.random() * action.footballers.length)];
+            
             const round = {
                 footballer, impostorId,
                 normalPlayerIds: participants.filter(id => id !== impostorId),
@@ -106,15 +122,21 @@ function transition(state, action) {
                 currentClueIndex: 0,
                 clues: new Map(), votes: new Map()
             };
+
             const effects = [
-                { type: 'ANNOUNCE_PUBLIC', message: '━━━━━━━━━━━━━━━━━━━━━━━━' },
-                { type: 'ANNOUNCE_PUBLIC', message: '🕵️ RONDA INICIADA. ¡REVISEN SUS PRIVADOS!', style: { color: 0x00FFFF, fontWeight: 'bold' } },
-                { type: 'ANNOUNCE_PUBLIC', message: '━━━━━━━━━━━━━━━━━━━━━━━━' }
+                { type: 'ANNOUNCE_PUBLIC', message: BORDER },
+                { type: 'ANNOUNCE_PUBLIC', message: `🕵️ ${s('ʀᴏɴᴅᴀ ɪɴɪᴄɪᴀᴅᴀ')} • ${s('ʀᴇᴠɪꜱᴇɴ ꜱᴜꜱ ᴘʀɪᴠᴀᴅᴏꜱ')}`, style: { color: 0x00FFFF, fontWeight: 'bold' } },
+                { type: 'ANNOUNCE_PUBLIC', message: BORDER }
             ];
+
             participants.forEach(id => {
-                const msg = id === impostorId ? '🕵️ ERES EL IMPOSTOR. Disimula y sobrevive.' : `⚽ EL JUGADOR ES: ${footballer.toUpperCase()}`;
+                const isImp = id === impostorId;
+                const msg = isImp 
+                    ? `👺 ${s('ᴇʀᴇꜱ ᴇʟ ɪᴍᴘᴏꜱᴛᴏʀ')} • ${s('ᴅɪꜱɪᴍᴜʟᴀ ʏ ꜱᴏʙʀᴇᴠɪᴠᴇ')}` 
+                    : `⚽ ${s('ᴇʟ ᴊᴜɢᴀᴅᴏʀ ᴇꜱ')}: ${footballer.toUpperCase()}`;
                 effects.push({ type: 'ANNOUNCE_PRIVATE', playerId: id, message: msg });
             });
+
             return { 
                 state: { ...state, phase: types_1.GamePhase.ASSIGN, currentRound: round, queue: state.queue.slice(5) }, 
                 sideEffects: effects 
@@ -131,17 +153,17 @@ function transition(state, action) {
             
             if (isLastClue) {
                 const effects = [
-                    { type: 'ANNOUNCE_PUBLIC', message: `💬 Última pista: "${action.clue}"` },
-                    { type: 'ANNOUNCE_PUBLIC', message: "📜 --- RESUMEN DE PISTAS ---", style: { color: 0xFFFF00, fontWeight: 'bold' } }
+                    { type: 'ANNOUNCE_PUBLIC', message: `💬 ${s('ᴜʟᴛɪᴍᴀ ᴘɪꜱᴛᴀ')}: "${action.clue}"` },
+                    { type: 'ANNOUNCE_PUBLIC', message: `📜 --- ${s('ʀᴇꜱᴜᴍᴇɴ ᴅᴇ ᴘɪꜱᴛᴀꜱ')} ---`, style: { color: 0xFFFF00, fontWeight: 'bold' } }
                 ];
 
                 rClue.clueOrder.forEach((id) => {
-                    const name = state.players.get(id)?.name || "Desconectado";
-                    const clueText = id === action.playerId ? action.clue : (newClues.get(id) || "Sin pista");
-                    effects.push({ type: 'ANNOUNCE_PUBLIC', message: `📍 ${name.toUpperCase()}: "${clueText}"`, style: { color: 0xFFFFFF } });
+                    const name = state.players.get(id)?.name || "---";
+                    const text = id === action.playerId ? action.clue : (newClues.get(id) || s('ꜱɪɴ ᴘɪꜱᴛᴀ'));
+                    effects.push({ type: 'ANNOUNCE_PUBLIC', message: `📍 ${name.toUpperCase()}: "${text}"`, style: { color: 0xFFFFFF } });
                 });
 
-                effects.push({ type: 'ANNOUNCE_PUBLIC', message: `🗣️ DEBATE (${state.settings.discussionTimeSeconds}s)`, style: { color: 0xFF9900, fontWeight: "bold" } });
+                effects.push({ type: 'ANNOUNCE_PUBLIC', message: `🗣️ ${s('ᴅᴇʙᴀᴛᴇ ɪɴɪᴄɪᴀᴅᴏ')} (${state.settings.discussionTimeSeconds}ꜱ)`, style: { color: 0xFF9900, fontWeight: "bold" } });
                 effects.push({ type: 'SET_PHASE_TIMER', durationSeconds: state.settings.discussionTimeSeconds });
 
                 return { 
@@ -151,21 +173,13 @@ function transition(state, action) {
             }
 
             const nextIndex = rClue.currentClueIndex + 1;
-            const nextPlayerId = rClue.clueOrder[nextIndex];
-            const nextPlayer = state.players.get(nextPlayerId);
-
-            if (!nextPlayer) {
-                return { 
-                    state: { ...state, currentRound: { ...rClue, clues: newClues, currentClueIndex: nextIndex } }, 
-                    sideEffects: [{ type: 'SET_PHASE_TIMER', durationSeconds: 0.1 }] 
-                };
-            }
+            const nextPlayer = state.players.get(rClue.clueOrder[nextIndex]);
 
             return { 
                 state: { ...state, currentRound: { ...rClue, clues: newClues, currentClueIndex: nextIndex } }, 
                 sideEffects: [
-                    { type: 'ANNOUNCE_PUBLIC', message: `💬 Pista: "${action.clue}"` },
-                    { type: 'ANNOUNCE_PUBLIC', message: `🔔 TURNO DE: ${nextPlayer.name.toUpperCase()}`, style: { color: 0xFFFF00, fontWeight: "bold" } },
+                    { type: 'ANNOUNCE_PUBLIC', message: `💬 ${s('ᴘɪꜱᴛᴀ')}: "${action.clue}"` },
+                    { type: 'ANNOUNCE_PUBLIC', message: `🔔 ${s('ᴛᴜʀɴᴏ ᴅᴇ')}: ${nextPlayer?.name.toUpperCase()}`, style: { color: 0xFFFF00, fontWeight: "bold" } },
                     { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.clueTimeSeconds }
                 ]
             };
@@ -174,16 +188,13 @@ function transition(state, action) {
         case 'END_DISCUSSION': {
             if (!state.currentRound) return { state, sideEffects: [] };
             const list = state.currentRound.clueOrder
-                .map((id, i) => {
-                    const p = state.players.get(id);
-                    return `[ ${i + 1} ] ${p ? p.name.toUpperCase() : "---"}`;
-                })
+                .map((id, i) => `[ ${i + 1} ] ${state.players.get(id)?.name.toUpperCase() || "---"}`)
                 .join('    ');
 
             return { 
                 state: { ...state, phase: types_1.GamePhase.VOTING }, 
                 sideEffects: [
-                    { type: 'ANNOUNCE_PUBLIC', message: `🗳️ ¡A VOTAR! ESCRIBAN EL NÚMERO:`, style: { color: 0xFF0000, fontWeight: "bold" } },
+                    { type: 'ANNOUNCE_PUBLIC', message: `🗳️ ${s('¡ᴀ ᴠᴏᴛᴀʀ! ᴇꜱᴄʀɪʙᴀɴ ᴇʟ ɴᴜᴍᴇʀᴏ')}:`, style: { color: 0xFF0000, fontWeight: "bold" } },
                     { type: 'ANNOUNCE_PUBLIC', message: list, style: { color: 0x00FFFF, fontWeight: "bold" } },
                     { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.votingTimeSeconds }
                 ] 
@@ -204,25 +215,28 @@ function transition(state, action) {
 
         case 'END_VOTING': return handleEndVoting(state);
         
-       case 'RESET_GAME': 
-       const lastFootballer = state.currentRound?.footballer || "Desconocido";
-
-    return { 
-        state: { ...state, phase: types_1.GamePhase.WAITING, currentRound: null }, 
-        sideEffects: [
-            { type: 'CLEAR_TIMER' },
-            { type: 'ANNOUNCE_PUBLIC', message: '━━━━━━━━━━━━━━━━━━━━━━━━' },
-            { type: 'ANNOUNCE_PUBLIC', message: `🎮 ¡PARTIDA FINALIZADA! EL FUTBOLISTA ERA ${lastFootballer.toUpperCase()}`, style: { color: 0x00FFCC, fontWeight: 'bold' } },
-            { type: 'ANNOUNCE_PUBLIC', message: '👉 Escriban "jugar" para la próxima.', style: { color: 0xFFFF00, fontWeight: 'bold' } },
-            { type: 'ANNOUNCE_PUBLIC', message: '━━━━━━━━━━━━━━━━━━━━━━━━' },
-            { type: 'AUTO_START_GAME' } 
-        ] 
-    };
+        case 'RESET_GAME': {
+            const lastFoot = state.currentRound?.footballer || "---";
+            return { 
+                state: { ...state, phase: types_1.GamePhase.WAITING, currentRound: null }, 
+                sideEffects: [
+                    { type: 'CLEAR_TIMER' },
+                    { type: 'ANNOUNCE_PUBLIC', message: BORDER },
+                    { type: 'ANNOUNCE_PUBLIC', message: `🎮 ${s('ᴘᴀʀᴛɪᴅᴀ ꜰɪɴᴀʟɪᴢᴀᴅᴀ')} • ${s('ᴇʟ ᴊᴜɢᴀᴅᴏʀ ᴇʀᴀ')}: ${lastFoot.toUpperCase()}`, style: { color: 0x00FFCC, fontWeight: 'bold' } },
+                    { type: 'ANNOUNCE_PUBLIC', message: `👉 ${s('ᴇꜱᴄʀɪʙᴀɴ')} "jugar" ${s('ᴘᴀʀᴀ ʟᴀ ᴘʀᴏxɪᴍᴀ ʀᴏɴᴅᴀ')}`, style: { color: 0xFFFF00, fontWeight: 'bold' } },
+                    { type: 'ANNOUNCE_PUBLIC', message: BORDER },
+                    { type: 'AUTO_START_GAME' } 
+                ] 
+            };
+        }
             
         default: return { state, sideEffects: [] };
     }
 }
 
+/**
+ * LÓGICA DE CIERRE DE VOTACIÓN (REVEAL)
+ */
 function handleEndVoting(state) {
     const round = state.currentRound;
     if (!round) return { state, sideEffects: [] };
@@ -235,7 +249,7 @@ function handleEndVoting(state) {
         return { 
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
             sideEffects: [
-                { type: 'ANNOUNCE_PUBLIC', message: "❌ NADIE VOTÓ. Empate técnico." }, 
+                { type: 'ANNOUNCE_PUBLIC', message: `❌ ${s('ɴᴀᴅɪᴇ ᴠᴏᴛᴏ')}! ${s('ᴇᴍᴘᴀᴛᴇ ᴛᴇᴄɴɪᴄᴏ')}.` }, 
                 { type: 'SET_PHASE_TIMER', durationSeconds: 5, nextAction: 'RESET_GAME' }
             ] 
         };
@@ -243,8 +257,7 @@ function handleEndVoting(state) {
 
     const votedOutId = parseInt(sorted[0]); 
     const isImpostor = votedOutId === round.impostorId;
-    const votedPlayer = state.players.get(votedOutId);
-    const votedName = (votedPlayer?.name || "Alguien").toUpperCase();
+    const votedName = (state.players.get(votedOutId)?.name || "Alguien").toUpperCase();
 
     if (isImpostor) {
         return { 
@@ -252,10 +265,10 @@ function handleEndVoting(state) {
             sideEffects: [
                 { type: 'CLEAR_TIMER' },
                 { type: 'MOVE_TO_SPECT', playerId: votedOutId },
-                { type: 'ANNOUNCE_PUBLIC', message: `━━━━━━━━━━━━━━━━━━━━━━━━` },
-                { type: 'ANNOUNCE_PUBLIC', message: `🎯 ¡LO CAZARON! ${votedName} ERA EL IMPOSTOR`, style: { color: 0x00FF00, fontWeight: "bold" } },
-                { type: 'ANNOUNCE_PUBLIC', message: `🏆 ¡VICTORIA PARA LOS INOCENTES!`, style: { color: 0x00FF00, fontWeight: "bold" } },
-                { type: 'ANNOUNCE_PUBLIC', message: `━━━━━━━━━━━━━━━━━━━━━━━━` },
+                { type: 'ANNOUNCE_PUBLIC', message: BORDER },
+                { type: 'ANNOUNCE_PUBLIC', message: `🎯 ¡${s('ʟᴏ ᴄᴀᴢᴀʀᴏɴ')}! ${votedName} ${s('ᴇʀᴀ ᴇʟ ɪᴍᴘᴏꜱᴛᴏʀ')}`, style: { color: 0x00FF00, fontWeight: "bold" } },
+                { type: 'ANNOUNCE_PUBLIC', message: `🏆 ¡${s('ᴠɪᴄᴛᴏʀɪᴀ ᴘᴀʀᴀ ʟᴏꜱ ɪɴᴏᴄᴇɴᴛᴇꜱ')}!`, style: { color: 0x00FF00, fontWeight: "bold" } },
+                { type: 'ANNOUNCE_PUBLIC', message: BORDER },
                 { type: 'UPDATE_STATS', winnerRole: 'INOCENTE', winners: round.clueOrder.filter(id => id !== round.impostorId) },
                 { type: 'SET_PHASE_TIMER', durationSeconds: 7, nextAction: 'RESET_GAME' }
             ] 
@@ -265,16 +278,16 @@ function handleEndVoting(state) {
     const remainingInnocents = round.normalPlayerIds.filter(id => id !== votedOutId);
     
     if (remainingInnocents.length <= 1) {
-        const impName = (state.players.get(round.impostorId)?.name || "El Impostor").toUpperCase();
+        const impName = (state.players.get(round.impostorId)?.name || "Impostor").toUpperCase();
         return { 
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
             sideEffects: [
                 { type: 'CLEAR_TIMER' },
                 { type: 'MOVE_TO_SPECT', playerId: votedOutId },
-                { type: 'ANNOUNCE_PUBLIC', message: `━━━━━━━━━━━━━━━━━━━━━━━━` },
-                { type: 'ANNOUNCE_PUBLIC', message: `💀 ¡GAME OVER! GANÓ EL IMPOSTOR (${impName})`, style: { color: 0xFF0000, fontWeight: "bold" } },
-                { type: 'ANNOUNCE_PUBLIC', message: `❌ ${votedName} ERA INOCENTE.`, style: { color: 0xFFFFFF } },
-                { type: 'ANNOUNCE_PUBLIC', message: `━━━━━━━━━━━━━━━━━━━━━━━━` },
+                { type: 'ANNOUNCE_PUBLIC', message: BORDER },
+                { type: 'ANNOUNCE_PUBLIC', message: `💀 ¡${s('ɢᴀᴍᴇ ᴏᴠᴇʀ')}! ${s('ɢᴀɴᴏ ᴇʟ ɪᴍᴘᴏꜱᴛᴏʀ')} (${impName})`, style: { color: 0xFF0000, fontWeight: "bold" } },
+                { type: 'ANNOUNCE_PUBLIC', message: `❌ ${votedName} ${s('ᴇʀᴀ ɪɴᴏᴄᴇɴᴛᴇ')}.`, style: { color: 0xFFFFFF } },
+                { type: 'ANNOUNCE_PUBLIC', message: BORDER },
                 { type: 'UPDATE_STATS', winnerRole: 'IMPOSTOR', winners: [round.impostorId] },
                 { type: 'SET_PHASE_TIMER', durationSeconds: 7, nextAction: 'RESET_GAME' }
             ] 
@@ -282,26 +295,20 @@ function handleEndVoting(state) {
     }
 
     const nextClueOrder = round.clueOrder.filter(id => id !== votedOutId);
-    const firstPlayerId = nextClueOrder[0];
-    const firstPlayerName = (state.players.get(firstPlayerId)?.name || "ALGUIEN").toUpperCase();
-
-    const nextRound = {
-        ...round,
-        normalPlayerIds: remainingInnocents,
-        clueOrder: nextClueOrder,
-        currentClueIndex: 0,
-        clues: new Map(),
-        votes: new Map()
-    };
+    const firstPlayerName = (state.players.get(nextClueOrder[0])?.name || "---").toUpperCase();
 
     return { 
-        state: { ...state, phase: types_1.GamePhase.CLUES, currentRound: nextRound }, 
+        state: { 
+            ...state, 
+            phase: types_1.GamePhase.CLUES, 
+            currentRound: { ...round, normalPlayerIds: remainingInnocents, clueOrder: nextClueOrder, currentClueIndex: 0, clues: new Map(), votes: new Map() } 
+        }, 
         sideEffects: [
             { type: 'CLEAR_TIMER' },
             { type: 'MOVE_TO_SPECT', playerId: votedOutId },
-            { type: 'ANNOUNCE_PUBLIC', message: `❌ ${votedName} ERA INOCENTE.`, style: { color: 0xFF4444, fontWeight: "bold" } },
-            { type: 'ANNOUNCE_PUBLIC', message: `📝 NUEVA RONDA DE PISTAS...`, style: { color: 0xFFFF00, fontWeight: "bold" } },
-            { type: 'ANNOUNCE_PUBLIC', message: `🔔 TURNO DE: ${firstPlayerName}`, style: { color: 0x00FFCC, fontWeight: "bold" } },
+            { type: 'ANNOUNCE_PUBLIC', message: `❌ ${votedName} ${s('ᴇʀᴀ ɪɴᴏᴄᴇɴᴛᴇ')}.`, style: { color: 0xFF4444, fontWeight: "bold" } },
+            { type: 'ANNOUNCE_PUBLIC', message: `📝 ${s('ɴᴜᴇᴠᴀ ʀᴏɴᴅᴀ ᴅᴇ ᴘɪꜱᴛᴀꜱ')}...`, style: { color: 0xFFFF00, fontWeight: "bold" } },
+            { type: 'ANNOUNCE_PUBLIC', message: `🔔 ${s('ᴛᴜʀɴᴏ ᴅᴇ')}: ${firstPlayerName}`, style: { color: 0x00FFCC, fontWeight: "bold" } },
             { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.clueTimeSeconds }
         ] 
     };
@@ -309,12 +316,11 @@ function handleEndVoting(state) {
 
 function transitionToClues(state) {
     if (!state.currentRound || !state.currentRound.clueOrder.length) return { state, sideEffects: [] };
-    const firstId = state.currentRound.clueOrder[0];
-    const first = state.players.get(firstId);
+    const first = state.players.get(state.currentRound.clueOrder[0]);
     return { 
         state: { ...state, phase: types_1.GamePhase.CLUES }, 
         sideEffects: [
-            { type: 'ANNOUNCE_PUBLIC', message: `📝 EMPIEZAN LAS PISTAS. TURNO DE: ${first?.name.toUpperCase() || "DESCONOCIDO"}`, style: { color: 0x00FFCC, fontWeight: "bold" } },
+            { type: 'ANNOUNCE_PUBLIC', message: `📝 ${s('ᴇᴍᴘɪᴇᴢᴀɴ ʟᴀꜱ ᴘɪꜱᴛᴀꜱ')} • ${s('ᴛᴜʀɴᴏ ᴅᴇ')}: ${first?.name.toUpperCase()}`, style: { color: 0x00FFCC, fontWeight: "bold" } },
             { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.clueTimeSeconds }
         ] 
     };
