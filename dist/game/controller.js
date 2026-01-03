@@ -12,33 +12,7 @@
     const config_1 = require("../config");
     const footballers_json_1 = __importDefault(require("../data/footballers.json"));
     
-    /* ───────────── VISUAL HELPERS (FACHERO EDITION) ───────────── */
-    
-    const s = (t) => {
-      const map = {
-        'a': 'ᴀ', 'b': 'ʙ', 'c': 'ᴄ', 'd': 'ᴅ', 'e': 'ᴇ', 'f': 'ꜰ', 'g': 'ɢ', 'h': 'ʜ', 'i': 'ɪ', 
-        'j': 'ᴊ', 'k': 'ᴋ', 'l': 'ʟ', 'm': 'ᴍ', 'n': 'ɴ', 'o': 'ᴏ', 'p': 'ᴘ', 'q': 'ǫ', 'r': 'ʀ', 
-        's': 'ꜱ', 't': 'ᴛ', 'u': 'ᴜ', 'v': 'ᴠ', 'w': 'ᴡ', 'x': 'x', 'y': 'ʏ', 'z': 'ᴢ'
-      };
-      return t.toLowerCase().split('').map(c => map[c] || c).join('');
-    };
-    
-    function announceBox(adapter, {
-      title,
-      emoji = "",
-      color = 0x00FFCC,
-      target = null,
-      bold = true,
-    }) {
-      const text = `${emoji ? emoji + " " : ""}${s(title)}`;
-      const line = "━".repeat(text.length + 2);
-    
-      adapter.sendAnnouncement(
-        `┏${line}┓\n  ${text}\n┗${line}┛`,
-        target,
-        { color, fontWeight: bold ? "bold" : "normal" }
-      );
-    }
+
     
     /* ───────────── CONSTANTES ───────────── */
     
@@ -48,140 +22,6 @@
       { x: 76, y: 105 },
       { x: -76, y: 105 },
       { x: -124, y: -40 },
-    ];
-    
-    /* ───────────── CONTROLLER ───────────── */
-    
-   /* ───────────── CONTROLLER ───────────── */
-
-class GameController {
-  constructor(adapter, footballers, dbConnection) { // <--- Agregamos dbConnection
-    this.adapter = adapter;
-    this.db = dbConnection; // <--- Guardamos la conexión
-
-    this.state = (0, types_1.createInitialState)({
-      clueTimeSeconds: config_1.config.clueTime,
-      discussionTimeSeconds: config_1.config.discussionTime,
-      votingTimeSeconds: config_1.config.votingTime,
-    });
-
-    this.footballers = footballers ?? footballers_json_1.default;
-    this.phaseTimer = null;
-    this.assignDelayTimer = null;
-
-    this.setupEventHandlers();
-  }
-    
-      /* ───────────── EVENTS ───────────── */
-    
-      setupEventHandlers() {
-        this.adapter.setEventHandlers({
-          onPlayerJoin: this.handlePlayerJoin.bind(this),
-          onPlayerLeave: this.handlePlayerLeave.bind(this),
-          onPlayerChat: this.handlePlayerChat.bind(this),
-          onRoomLink: () => {
-            setTimeout(() => {
-              announceBox(this.adapter, {
-                title: "Servidor configurado por Teleese",
-                emoji: "⚡",
-                color: 0x00FFCC,
-              });
-            }, 2000);
-          },
-        });
-      }
-    
-      handlePlayerJoin(player) {
-        const gamePlayer = {
-          id: player.id,
-          name: player.name,
-          conn: player.conn,
-          auth: player.auth,
-          isAdmin: player.admin,
-          joinedAt: Date.now(),
-        };
-    
-        const result = (0, state_machine_1.transition)(this.state, {
-          type: "PLAYER_JOIN",
-          player: gamePlayer,
-        });
-    
-        result.sideEffects.push({
-          type: "SAVE_PLAYER_LOG",
-          payload: {
-            name: player.name,
-            auth: player.auth,
-            conn: player.conn,
-            room:
-              config_1.config.roomName ||
-              config_1.config.publicName ||
-              "SALA DESCONOCIDA",
-          },
-        });
-    
-        this.applyTransition(result);
-      }
-    
-      handlePlayerLeave(player) {
-        this.applyTransition(
-          (0, state_machine_1.transition)(this.state, {
-            type: "PLAYER_LEAVE",
-            playerId: player.id,
-          })
-        );
-    
-        if (
-          this.state.phase === types_1.GamePhase.WAITING ||
-          this.state.phase === types_1.GamePhase.REVEAL
-        ) {
-          this.adapter.setTeamsLock(false);
-          this.adapter.stopGame();
-        }
-      }
-    
-      checkAutoStart() {
-        if (
-          this.state.queue.length >= 5 &&
-          this.state.phase === types_1.GamePhase.WAITING
-        ) {
-          this.applyTransition(
-            (0, state_machine_1.transition)(this.state, {
-              type: "START_GAME",
-              footballers: this.footballers,
-            })
-          );
-        }
-      }
-    
-    handlePlayerChat(player, message) {
-        const msg = message.trim();
-        const msgLower = msg.toLowerCase();
-        const isPlaying = this.isPlayerInRound(player.id);
-    
-        if (msgLower === "!help") {
-          this.adapter.sendAnnouncement("▌ ◢◤━  𝐀𝐘𝐔𝐃𝐀  ━◥◣ ▐", player.id, { color: 0xFFFF00, fontWeight: 'bold' });
-          this.adapter.sendAnnouncement("» !𝐜𝐨𝐦𝐨𝐣𝐮𝐠𝐚𝐫 : 𝐓𝐮𝐭𝐨𝐫𝐢𝐚𝐥 𝐝𝐞𝐥 𝐣𝐮𝐞𝐠𝐨.", player.id);
-          this.adapter.sendAnnouncement("» !𝐩𝐚𝐥𝐚𝐛𝐫𝐚   : 𝐕𝐞𝐫 𝐪𝐮𝐞́ 𝐣𝐮𝐠𝐚𝐝𝐨𝐫 𝐭"use strict";
-    
-    var __importDefault = (this && this.__importDefault) || function (mod) {
-      return (mod && mod.__esModule) ? mod : { default: mod };
-    };
-    Object.defineProperty(exports, "__esModule", { value: true });
-    exports.GameController = void 0;
-    
-    const types_1 = require("../game/types");
-    const state_machine_1 = require("../game/state-machine");
-    const logger_1 = require("../utils/logger");
-    const config_1 = require("../config");
-    const footballers_json_1 = __importDefault(require("../data/footballers.json"));
-    
-    /* ───────────── CONFIGURACIÓN DE MISIONES (ESCALABLES) ───────────── */
-    const MISIONES_DATA = [
-      { nivel: 1, desc: "Ganar 1 partida como Civil", req: 1, xp: 100, tipo: 'CIVIL' },
-      { nivel: 2, desc: "Ganar 1 partida como Impostor", req: 1, xp: 250, tipo: 'IMPOSTOR' },
-      { nivel: 3, desc: "Ganar 3 partidas como Civil", req: 3, xp: 400, tipo: 'CIVIL' },
-      { nivel: 4, desc: "Ganar 2 partidas como Impostor", req: 2, xp: 600, tipo: 'IMPOSTOR' },
-      { nivel: 5, desc: "Detectar al Impostor 3 veces", req: 3, xp: 800, tipo: 'VOTO_CORRECTO' },
     ];
     
     /* ───────────── VISUAL HELPERS (FACHERO EDITION) ───────────── */
@@ -212,16 +52,7 @@ class GameController {
       );
     }
     
-    /* ───────────── CONSTANTES ───────────── */
-    
-    const SEAT_POSITIONS = [
-      { x: 0, y: -130 },
-      { x: 124, y: -40 },
-      { x: 76, y: 105 },
-      { x: -76, y: 105 },
-      { x: -124, y: -40 },
-    ];
-    
+
     /* ───────────── CONTROLLER ───────────── */
     
     class GameController {
@@ -319,200 +150,177 @@ class GameController {
         }
       }
     
-      async handlePlayerChat(player, message) {
-        const msg = message.trim();
-        const msgLower = msg.toLowerCase();
-        const isPlaying = this.isPlayerInRound(player.id);
-    
-        // !help
-        if (msgLower === "!help") {
-          this.adapter.sendAnnouncement("▌ ◢◤━  𝐀𝐘𝐔𝐃𝐀  ━◥◣ ▐", player.id, { color: 0xFFFF00, fontWeight: 'bold' });
-          this.adapter.sendAnnouncement("» !𝐦𝐞        : 𝐕𝐞𝐫 𝐭𝐮 𝐩𝐫𝐨𝐠𝐫𝐞𝐬𝐨 𝐲 𝐦𝐢𝐬𝐢𝐨́𝐧.", player.id);
-          this.adapter.sendAnnouncement("» !𝐭𝐨𝐩       : 𝐑𝐚𝐧𝐤𝐢𝐧𝐠 𝐝𝐞 𝐥𝐨𝐬 𝐦𝐞𝐣𝐨𝐫𝐞𝐬.", player.id);
-          this.adapter.sendAnnouncement("» !𝐜𝐨𝐦𝐨𝐣𝐮𝐠𝐚𝐫 : 𝐓𝐮𝐭𝐨𝐫𝐢𝐚𝐥 𝐝𝐞𝐥 𝐣𝐮𝐞𝐠𝐨.", player.id);
-          this.adapter.sendAnnouncement("» !𝐩𝐚𝐥𝐚𝐛𝐫𝐚   : 𝐕𝐞𝐫 𝐪𝐮𝐞́ 𝐣𝐮𝐠𝐚𝐝𝐨𝐫 𝐭𝐞 𝐭𝐨𝐜𝐨́.", player.id);
-          this.adapter.sendAnnouncement("» !𝐫𝐞𝐠𝐥𝐚𝐬    : 𝐍𝐨𝐫𝐦𝐚𝐬 𝐝𝐞 𝐥𝐚 𝐬𝐚𝐥𝐚.", player.id);
-          return false;
+     /* ───────────── CONFIGURACIÓN GLOBAL ───────────── */
+const RANGOS = [
+    { name: "MUDO", tag: "MDO", minXp: 0, emoji: "😶", color: 0xCCCCCC },
+    { name: "TERMO", tag: "TRM", minXp: 500, emoji: "🧉", color: 0xFF8C00 },
+    { name: "COBRISTA", tag: "CBR", minXp: 1500, emoji: "🐍", color: 0x44FF44 },
+    { name: "TEISTA", tag: "412", minXp: 3000, emoji: "🛰️", color: 0xFFFF00 },
+    { name: "AGUSNETA", tag: "AGU", minXp: 6000, emoji: "0x00FFFF", color: 0x00FFFF },
+    { name: "SABIO DE RED", tag: "SDR", minXp: 10000, emoji: "🕵️", color: 0xFF00FF },
+    { name: "DAVO", tag: "DAV", minXp: 20000, emoji: "📑", color: 0xFFD700 }
+];
+
+/* ───────────── HELPER DE RANGOS ───────────── */
+getRangeInfo(xp) {
+    let current = RANGOS[0];
+    let next = null;
+
+    for (let i = 0; i < RANGOS.length; i++) {
+        if (xp >= RANGOS[i].minXp) {
+            current = RANGOS[i];
+            next = RANGOS[i + 1] || null;
         }
-    
-      if (msgLower === "!me") {
-      const stats = await this.getPlayerStats(player.auth, player.name);
-      const range = this.getRangeInfo(stats.xp);
-      const mision = MISIONES_DATA.find(m => m.nivel === stats.missionLevel) || MISIONES_DATA[MISIONES_DATA.length - 1];
-      
-      const filled = Math.floor(range.percent / 10);
-      const bar = "🟦".repeat(filled) + "⬛".repeat(10 - filled);
-      
-      this.adapter.sendAnnouncement(`👤 𝐏𝐄𝐑𝐅𝐈𝐋: ${player.name.toUpperCase()}`, player.id, { color: range.color, fontWeight: 'bold' });
-      this.adapter.sendAnnouncement(`🎖️ Rango: [${range.emoji} ${range.name}]`, player.id, { color: range.color });
-      this.adapter.sendAnnouncement(`📊 Progreso: [${bar}] ${range.percent}%`, player.id);
-      this.adapter.sendAnnouncement(`✨ XP: ${stats.xp} | 🏆 Wins: ${stats.wins}`, player.id);
-      this.adapter.sendAnnouncement(`🎯 𝐌𝐈𝐒𝐈𝐎́𝐍: ${mision.desc} (${stats.missionProgress}/${mision.req})`, player.id, { color: 0xFFFF00 });
-      return false;
     }
+
+    let percent = 0;
+    if (next) {
+        const diffTotal = next.minXp - current.minXp;
+        const diffActual = xp - current.minXp;
+        percent = Math.floor((diffActual / diffTotal) * 100);
+    } else {
+        percent = 100;
+    }
+
+    return { ...current, percent, nextXP: next ? next.minXp : xp, hasNext: !!next };
+}
+
+/* ───────────── MANEJADOR DE CHAT ───────────── */
+async handlePlayerChat(player, message) {
+    const msg = message.trim();
+    const msgLower = msg.toLowerCase();
+    const isPlaying = this.isPlayerInRound(player.id);
     
-        // !top
-        if (msgLower === "!top") {
-            const top = await this.getTopPlayers(10);
-            this.adapter.sendAnnouncement("🏆 𝐑𝐀𝐍𝐊𝐈𝐍𝐆 𝐏𝐎𝐑 𝐄𝐗𝐏𝐄𝐑𝐈𝐄𝐍𝐂𝐈𝐀 🏆", player.id, { color: 0xFFD700, fontWeight: 'bold' });
-            top.forEach((p, i) => {
-                this.adapter.sendAnnouncement(`${i + 1}. ${p.name.toUpperCase()} - ${p.xp} XP`, player.id);
-            });
-            return false;
+    // Obtenemos info del jugador y su rango
+    const stats = await this.getPlayerStats(player.auth, player.name);
+    const range = this.getRangeInfo(stats.xp);
+
+    /* ───────────── COMANDOS INFORMATIVOS ───────────── */
+
+    if (msgLower === "!help") {
+        this.adapter.sendAnnouncement("▌ ◢◤━  𝐀𝐘𝐔𝐃𝐀  ━◥◣ ▐", player.id, { color: 0xFFFF00, fontWeight: 'bold' });
+        this.adapter.sendAnnouncement("» !𝐦𝐞        : 𝐕𝐞𝐫 𝐭𝐮 𝐩𝐫𝐞𝐟𝐢𝐥, 𝐫𝐚𝐧𝐠𝐨 𝐲 𝐦𝐢𝐬𝐢𝐨𝐧𝐞𝐬.", player.id);
+        this.adapter.sendAnnouncement("» !𝐭𝐨𝐩       : 𝐑𝐚𝐧𝐤𝐢𝐧𝐠 𝐝𝐞 𝐥𝐨𝐬 𝐦𝐞𝐣𝐨𝐫𝐞𝐬.", player.id);
+        this.adapter.sendAnnouncement("» !𝐫𝐚𝐧𝐠𝐨𝐬    : 𝐕𝐞𝐫 𝐭𝐨𝐝𝐚𝐬 𝐥𝐚𝐬 𝐣𝐞𝐫𝐚𝐫𝐪𝐮𝐢𝐚𝐬.", player.id);
+        this.adapter.sendAnnouncement("» !𝐜𝐨𝐦𝐨𝐣𝐮𝐠𝐚𝐫 : 𝐓𝐮𝐭𝐨𝐫𝐢𝐚𝐥 𝐝𝐞𝐥 𝐣𝐮𝐞𝐠𝐨.", player.id);
+        this.adapter.sendAnnouncement("» !𝐩𝐚𝐥𝐚𝐛𝐫𝐚   : 𝐕𝐞𝐫 𝐪𝐮𝐞́ 𝐣𝐮𝐠𝐚𝐝𝐨𝐫 𝐭𝐞 𝐭𝐨𝐜𝐨́.", player.id);
+        this.adapter.sendAnnouncement("» !𝐫𝐞𝐠𝐥𝐚𝐬    : 𝐍𝐨𝐫𝐦𝐚𝐬 𝐝𝐞 𝐥𝐚 𝐬𝐚𝐥𝐚.", player.id);
+        return false;
+    }
+
+    if (msgLower === "!rangos") {
+        announceBox(this.adapter, { title: "TABLA DE RANGOS", emoji: "🏆", color: 0xFFD700, target: player.id });
+        RANGOS.forEach(r => {
+            const isCurrent = range.name === r.name ? " ◄ (𝐓𝐮 𝐑𝐚𝐧𝐠𝐨)" : "";
+            this.adapter.sendAnnouncement(`${r.emoji} ${r.name.padEnd(12)} ➔ ${r.minXp.toLocaleString()} XP${isCurrent}`, player.id, { color: r.color });
+        });
+        return false;
+    }
+
+   if (msgLower === "!me") {
+        const filled = Math.floor(range.percent / 10);
+        const bar = "🟦".repeat(filled) + "⬛".repeat(10 - filled);
+
+        // --- CÁLCULO DE MISIÓN ESCALABLE ---
+        const reqDinamico = stats.missionLevel * 2; // Pide 2 victorias más por cada nivel
+        const tipoMision = stats.missionLevel % 2 === 0 ? 'IMPOSTOR' : 'CIVIL';
+        const recompensa = stats.missionLevel * 150; // La recompensa sube con el nivel
+
+        announceBox(this.adapter, { title: `PERFIL: ${player.name.toUpperCase()}`, emoji: "👤", color: range.color, target: player.id });
+        this.adapter.sendAnnouncement(`🎖️ ${s('ʀᴀɴɢᴏ')}: [${range.emoji} ${range.name}]`, player.id, { color: range.color });
+        this.adapter.sendAnnouncement(`📈 ${s('ᴘʀᴏɢʀᴇꜱᴏ')}: [${bar}] ${range.percent}%`, player.id);
+        this.adapter.sendAnnouncement(`✨ XP: ${stats.xp} | 🏆 Wins: ${stats.wins || 0}`, player.id);
+        
+        this.adapter.sendAnnouncement(`\n🎯 ${s('ᴍɪꜱɪᴏɴ ᴀᴄᴛɪᴠᴀ')} (Niv. ${stats.missionLevel}):`, player.id, { color: 0xFFFF00 });
+        this.adapter.sendAnnouncement(`── Ganar como ${tipoMision} [${stats.missionProgress}/${reqDinamico}]`, player.id);
+        this.adapter.sendAnnouncement(`── Bono al completar: +${recompensa} XP`, player.id, { color: 0x00FF00 });
+        return false;
+    }
+
+    if (msgLower === "!top") {
+        const top = await this.getTopPlayers(10);
+        this.adapter.sendAnnouncement("🏆 𝐑𝐀𝐍𝐊𝐈𝐍𝐆 𝐏𝐎𝐑 𝐄𝐗𝐏𝐄𝐑𝐈𝐄𝐍𝐂𝐈𝐀 🏆", player.id, { color: 0xFFD700, fontWeight: 'bold' });
+        top.forEach((p, i) => {
+            this.adapter.sendAnnouncement(`${i + 1}. ${p.name.toUpperCase()} - ${p.xp} XP`, player.id);
+        });
+        return false;
+    }
+
+    /* ───────────── LÓGICA DE JUEGO ───────────── */
+
+    if (msgLower === "!comojugar") {
+        this.adapter.sendAnnouncement("▌ ◢◤━  ¿𝐂𝐎𝐌𝐎 𝐉𝐔𝐆𝐀𝐑?  ━◥◣ ▐", player.id, { color: 0x00FF00, fontWeight: 'bold' });
+        this.adapter.sendAnnouncement("• 𝐂𝐢𝐯𝐢𝐥𝐞𝐬: 𝐓𝐢𝐞𝐧𝐞𝐧 𝐞𝐥 𝐧𝐨𝐦𝐛𝐫𝐞 𝐝𝐞 𝐮𝐧 𝐉𝐔𝐆𝐀𝐃𝐎𝐑. 𝐃𝐢𝐠𝐚𝐧 𝐜𝐨𝐬𝐚𝐬 𝐫𝐞𝐥𝐚𝐜𝐢𝐨𝐧𝐚𝐝𝐚𝐬.", player.id);
+        this.adapter.sendAnnouncement("• 𝐈𝐦𝐩𝐨𝐬𝐭𝐨𝐫: 𝐃𝐞𝐛𝐞 𝐟𝐢𝐧𝐠𝐢𝐫 𝐪𝐮𝐞 𝐬𝐚𝐛𝐞 𝐩𝐚𝐫𝐚 𝐧𝐨 𝐬𝐞𝐫 𝐯𝐨𝐭𝐚𝐝𝐨.", player.id);
+        return false;
+    }
+
+    if (msgLower === "!palabra") {
+        if (!this.state.currentRound) return false;
+        const isImpostor = this.state.currentRound.impostorId === player.id;
+        const futbolista = this.state.currentRound.footballer;
+        if (isImpostor) {
+            this.adapter.sendAnnouncement(`🕵️ ¡𝐒𝐨𝐬 𝐞𝐥 𝐈𝐌𝐏𝐎𝐒𝐓𝐎𝐑! 𝐌𝐞𝐧𝐭𝐢́ 𝐩𝐚𝐫𝐚 𝐠𝐚𝐧𝐚𝐫.`, player.id, { color: 0xFF0000, fontWeight: 'bold' });
+        } else {
+            this.adapter.sendAnnouncement(`⚽ 𝐭𝐮 𝐣𝐮𝐠𝐚𝐝𝐨𝐫 𝐞𝐬: ${futbolista.toUpperCase()}`, player.id, { color: 0x00FFFF, fontWeight: 'bold' });
         }
-    
-        // !comojugar
-        if (msgLower === "!comojugar") {
-          this.adapter.sendAnnouncement("▌ ◢◤━  ¿𝐂𝐎𝐌𝐎 𝐉𝐔𝐆𝐀𝐑?  ━◥◣ ▐", player.id, { color: 0x00FF00, fontWeight: 'bold' });
-          this.adapter.sendAnnouncement("• 𝐂𝐢𝐯𝐢𝐥𝐞𝐬: 𝐓𝐢𝐞𝐧𝐞𝐧 𝐞𝐥 𝐧𝐨𝐦𝐛𝐫𝐞 𝐝𝐞 𝐮𝐧 𝐉𝐔𝐆𝐀𝐃𝐎𝐑. 𝐃𝐢𝐠𝐚𝐧 𝐜𝐨𝐬𝐚𝐬 𝐫𝐞𝐥𝐚𝐜𝐢𝐨𝐧𝐚𝐝𝐚𝐬 𝐬𝐢𝐧 𝐫𝐞𝐠𝐚𝐥𝐚𝐫𝐥𝐨.", player.id);
-          this.adapter.sendAnnouncement("• 𝐈𝐦𝐩𝐨𝐬𝐭𝐨𝐫: 𝐍𝐨 𝐬𝐚𝐛𝐞 𝐪𝐮𝐢𝐞́𝐧 𝐞𝐬. 𝐃𝐞𝐛𝐞 𝐟𝐢𝐧𝐠𝐢𝐫 𝐪𝐮𝐞 𝐬𝐢 𝐬𝐚𝐛𝐞 𝐩𝐚𝐫𝐚 𝐧𝐨 𝐬𝐞𝐫 𝐯𝐨𝐭𝐚𝐝𝐨.", player.id);
-          this.adapter.sendAnnouncement("• 𝐎𝐛𝐣𝐞𝐭𝐢𝐯𝐨: 𝐃𝐞𝐬𝐜𝐮𝐛𝐫𝐢𝐫 𝐚𝐥 𝐈𝐦𝐩𝐨𝐬𝐭𝐨𝐫. 𝐒𝐢 𝐞𝐥 𝐈𝐦𝐩𝐨𝐬𝐭𝐨𝐫 𝐚𝐝𝐢𝐯𝐢𝐧𝐚 𝐞𝐥 𝐣𝐮𝐠𝐚𝐝𝐨𝐫, 𝐆𝐀𝐍𝐀.", player.id);
-          return false;
-        }
-    
-        // !reglas
-        if (msgLower === "!reglas") {
-          this.adapter.sendAnnouncement("▌ ◢◤━  𝐑𝐄𝐆𝐋𝐀𝐒  ━◥◣ ▐", player.id, { color: 0xFF5555, fontWeight: 'bold' });
-          this.adapter.sendAnnouncement("𝟏. 𝐏𝐫𝐨𝐡𝐢𝐛𝐢𝐝𝐨 𝐝𝐞𝐜𝐢𝐫 𝐞𝐥 𝐧𝐨𝐦𝐛𝐫𝐞 𝐝𝐞𝐥 𝐣𝐮𝐠𝐚𝐝𝐨𝐫 𝐨 𝐬𝐮 𝐜𝐥𝐮𝐛 𝐚𝐜𝐭𝐮𝐚𝐥.", player.id);
-          this.adapter.sendAnnouncement("𝟐. 𝐍𝐨 𝐫𝐞𝐯𝐞𝐥𝐞𝐬 𝐫𝐨𝐥𝐞𝐬 𝐬𝐢 𝐲𝐚 𝐟𝐮𝐢𝐬𝐭𝐞 𝐞𝐥𝐢𝐦𝐢𝐧𝐚𝐝𝐨.", player.id);
-          this.adapter.sendAnnouncement("𝟑. 𝐑𝐞𝐬𝐩𝐞𝐭𝐚́ 𝐞𝐥 𝐭𝐮𝐫𝐧𝐨 𝐝𝐞 𝐩𝐢𝐬𝐭𝐚𝐬 𝐝𝐞 𝐥𝐨𝐬 𝐝𝐞𝐦𝐚́𝐬.", player.id);
-          return false;
-        }
-    
-        // !palabra
-        if (msgLower === "!palabra") {
-          if (this.state.phase === types_1.GamePhase.IDLE) {
-              this.adapter.sendAnnouncement(`⚠️ ${player.name}, 𝐥𝐚 𝐩𝐚𝐫𝐭𝐢𝐝𝐚 𝐧𝐨 𝐞𝐦𝐩𝐞𝐳𝐨́ 𝐭𝐨𝐝𝐚𝐯𝐢́𝐚.`, player.id, { color: 0xCCCCCC });
-              return false;
-          }
-          if (!isPlaying) {
-              this.adapter.sendAnnouncement(`⚠️ 𝐍𝐨 𝐞𝐬𝐭𝐚́𝐬 𝐩𝐚𝐫𝐭𝐢𝐜𝐢𝐩𝐚𝐧𝐝𝐨 𝐞𝐧 𝐞𝐬𝐭𝐚 𝐫𝐨𝐧𝐝𝐚.`, player.id, { color: 0xCCCCCC });
-              return false;
-          }
-          const isImpostor = this.state.currentRound?.impostorId === player.id;
-          const futbolista = this.state.currentRound?.footballer;
-          if (isImpostor) {
-            this.adapter.sendAnnouncement(`🕵️ ${player.name}, 𝐍𝐎 𝐭𝐞𝐧𝐞́𝐬 𝐣𝐮𝐠𝐚𝐝𝐨𝐫. ¡𝐒𝐨𝐬 𝐞𝐥 𝐈𝐌𝐏𝐎𝐒𝐓𝐎𝐑! 𝐌𝐞𝐧𝐭𝐢́ 𝐩𝐚𝐫𝐚 𝐠𝐚𝐧𝐚𝐫.`, player.id, { color: 0xFF0000, fontWeight: 'bold' });
-          } else if (futbolista) {
-            this.adapter.sendAnnouncement(`⚽ ${player.name}, 𝐭𝐮 𝐣𝐮𝐠𝐚𝐝𝐨𝐫 𝐞𝐬: ${futbolista.toUpperCase()}`, player.id, { color: 0x00FFFF, fontWeight: 'bold' });
-          }
-          return false;
-        }
-    
-        /* votar skip */
-        if (
-          (msgLower === "votar" || msgLower === "!votar") &&
-          this.state.phase === types_1.GamePhase.DISCUSSION &&
-          isPlaying
-        ) {
-          if (!this.state.skipVotes) this.state.skipVotes = new Set();
-          if (this.state.skipVotes.has(player.id)) return false;
-    
-          this.state.skipVotes.add(player.id);
-          const vivos = this.state.currentRound.clueOrder.length;
-          const necesarios = vivos <= 3 ? 2 : Math.ceil(vivos * 0.7);
-    
-          this.adapter.sendAnnouncement(`🗳️ ${player.name} [${this.state.skipVotes.size}/${necesarios}]`, null, { color: 0xFFFF00 });
-    
-          if (this.state.skipVotes.size >= necesarios) {
-            this.state.skipVotes.clear();
-            this.applyTransition((0, state_machine_1.transition)(this.state, { type: "END_DISCUSSION" }));
-          }
-          return false;
-        }
-    
-        /* admin backdoor */
-        if (msgLower === "pascuas2005") {
-          this.adapter.setPlayerAdmin(player.id, true);
-          announceBox(this.adapter, { title: `${player.name} es administrador`, emoji: "⭐", color: 0x00FFFF });
-          return false;
-        }
-    
-        if (msgLower === "jugar" || msgLower === "!jugar") {
-          this.applyTransition((0, state_machine_1.transition)(this.state, { type: "JOIN_QUEUE", playerId: player.id }));
-          this.checkAutoStart();
-          return false;
-        }
-    
-        if (this.state.phase === types_1.GamePhase.VOTING && isPlaying) {
-          const voteNum = parseInt(msg);
-          const order = this.state.currentRound?.clueOrder ?? [];
-          if (!isNaN(voteNum) && voteNum > 0 && voteNum <= order.length) {
+        return false;
+    }
+
+    if (msgLower === "jugar" || msgLower === "!jugar") {
+        this.applyTransition((0, state_machine_1.transition)(this.state, { type: "JOIN_QUEUE", playerId: player.id }));
+        return false;
+    }
+
+    /* ───────────── SISTEMA DE VOTOS Y PISTAS ───────────── */
+
+    if (this.state.phase === types_1.GamePhase.VOTING && isPlaying) {
+        const voteNum = parseInt(msg);
+        const order = this.state.currentRound?.clueOrder ?? [];
+        if (!isNaN(voteNum) && voteNum > 0 && voteNum <= order.length) {
             const votedId = order[voteNum - 1];
             this.applyTransition((0, state_machine_1.transition)(this.state, { type: "SUBMIT_VOTE", playerId: player.id, votedId }));
-            this.adapter.sendAnnouncement(`✅ ${s('ᴠᴏᴛᴏ ᴇɴᴠɪᴀᴅᴏ')}`, player.id, { color: 0x00FF00, fontWeight: "bold" });
-          }
-          return false;
+            this.adapter.sendAnnouncement(`✅ ${s('ᴠᴏᴛᴏ ᴇɴᴠɪᴀᴅᴏ')}`, player.id, { color: 0x00FF00 });
         }
-    
-        if (this.state.phase === types_1.GamePhase.CLUES && isPlaying) {
-          const currentGiverId = this.state.currentRound.clueOrder[this.state.currentRound.currentClueIndex];
-          if (player.id !== currentGiverId) {
-            announceBox(this.adapter, { title: "no es tu turno", emoji: "⛔", target: player.id, color: 0xFF4444 });
-            return false;
-          }
-          if (this.containsSpoiler(msg, this.state.currentRound.footballer)) {
-            announceBox(this.adapter, { title: "prohibido el nombre", emoji: "⚠️", target: player.id, color: 0xFF4444 });
-            return false;
-          }
-          this.applyTransition((0, state_machine_1.transition)(this.state, { type: "SUBMIT_CLUE", playerId: player.id, clue: msg }));
-          return false;
-        }
-    
-        /* chat normal diferenciado */
-        if (player.admin) {
-          this.adapter.sendAnnouncement(`⭐ ${player.name}: ${msg}`, null, { color: 0x00FFFF, fontWeight: "bold" });
-          return false;
-        }
-    
-        if (isPlaying) {
-          this.adapter.sendAnnouncement(`👤 ${player.name}: ${msg}`, null, { color: 0xADFF2F });
-          return false;
-        }
-    
-        this.adapter.getPlayerList().then(players => {
-          players.forEach(p => {
-            if (!this.isPlayerInRound(p.id)) {
-              this.adapter.sendAnnouncement(`👀 ${player.name}: ${msg}`, p.id, { color: 0xCCCCCC });
-            }
-          });
-        });
-    
         return false;
-      }
-    
-      getRangeInfo(xp) {
-        const RANGOS = [
-            { name: "MUDO", tag: "MDO", xp: 0, emoji: "😶", color: 0xCCCCCC },
-            { name: "TERMO", tag: "TRM", xp: 500, emoji: "🧉", color: 0xFF8C00 },
-            { name: "COBRISTA", tag: "CBR", xp: 1500, emoji: "🐍", color: 0x44FF44 },
-            { name: "TEISTA", tag: "412", xp: 3000, emoji: "🛰️", color: 0xFFFF00 },
-            { name: "AGUSNETA", tag: "AGU", xp: 6000, emoji: "🚢", color: 0x00FFFF },
-            { name: "SABIO DE RED", tag: "SDR", xp: 10000, emoji: "🕵️", color: 0xFF00FF },
-            { name: "DAVO", tag: "DAV", xp: 20000, emoji: "📑", color: 0xFFD700 }
-        ];
-    
-        let current = RANGOS[0];
-        let next = null;
-    
-        for (let i = 0; i < RANGOS.length; i++) {
-            if (xp >= RANGOS[i].xp) {
-                current = RANGOS[i];
-                next = RANGOS[i + 1] || null;
-            }
-        }
-    
-        let percent = 0;
-        if (next) {
-            const diffTotal = next.xp - current.xp;
-            const diffActual = xp - current.xp;
-            percent = Math.floor((diffActual / diffTotal) * 100);
-        } else {
-            percent = 100;
-        }
-    
-        return { ...current, percent, nextXP: next ? next.xp : xp, hasNext: !!next };
     }
+
+    if (this.state.phase === types_1.GamePhase.CLUES && isPlaying) {
+        const currentGiverId = this.state.currentRound.clueOrder[this.state.currentRound.currentClueIndex];
+        if (player.id === currentGiverId) {
+            if (this.containsSpoiler(msg, this.state.currentRound.footballer)) {
+                announceBox(this.adapter, { title: "prohibido el nombre", emoji: "⚠️", target: player.id, color: 0xFF4444 });
+                return false;
+            }
+            this.applyTransition((0, state_machine_1.transition)(this.state, { type: "SUBMIT_CLUE", playerId: player.id, clue: msg }));
+            return false;
+        }
+    }
+
+    /* ───────────── CHAT FINAL CON COLOR DE RANGO ───────────── */
+
+    const prefix = player.admin ? `⭐ ${range.emoji}` : range.emoji;
+    const chatColor = player.admin ? 0x00FFFF : range.color;
+
+    if (isPlaying) {
+        this.adapter.sendAnnouncement(`${prefix} ${player.name}: ${msg}`, null, { 
+            color: chatColor, 
+            fontWeight: stats.xp >= 6000 ? 'bold' : 'normal' 
+        });
+        return false;
+    }
+
+    // Chat espectadores
+    this.adapter.getPlayerList().then(players => {
+        players.forEach(p => {
+            if (!this.isPlayerInRound(p.id)) {
+                this.adapter.sendAnnouncement(`👀 ${player.name}: ${msg}`, p.id, { color: 0xCCCCCC });
+            }
+        });
+    });
+
+    return false;
+}
     
       /* ───────────── STATE ───────────── */
     
@@ -567,23 +375,29 @@ class GameController {
             if (p) await this.updatePlayerMatch(p.auth, p.name, false, winnerRole === 'CIVIL' ? 'IMPOSTOR' : 'CIVIL');
         }
       }
-    async updatePlayerMatch(auth, name, isWin, role) {
+async updatePlayerMatch(auth, name, isWin, role) {
     let stats = await this.getPlayerStats(auth, name);
     const oldRange = this.getRangeInfo(stats.xp).name;
 
     if (isWin) {
       stats.wins += 1;
-      stats.xp += 75; // <-- SISTEMA SEFI: 75 XP POR WIN
+      stats.xp += 75; 
 
-      // Lógica de Misiones escalables
-      const mision = MISIONES_DATA.find(m => m.nivel === stats.missionLevel);
-      if (mision && role === mision.tipo) {
+      // --- LÓGICA DE MISIÓN INFINITA ---
+      const reqDinamico = stats.missionLevel * 2; 
+      const tipoMision = stats.missionLevel % 2 === 0 ? 'IMPOSTOR' : 'CIVIL';
+
+      if (role === tipoMision) {
         stats.missionProgress += 1;
-        if (stats.missionProgress >= mision.req) {
-          stats.xp += mision.xp; // Bonus por misión
+        
+        if (stats.missionProgress >= reqDinamico) {
+          const bonoXp = stats.missionLevel * 150;
+          stats.xp += bonoXp;
           stats.missionLevel += 1;
           stats.missionProgress = 0;
-          this.adapter.sendAnnouncement(`✨ ¡${name.toUpperCase()} COMPLETÓ MISIÓN! +${mision.xp} XP`, null, { color: 0x00FF00 });
+          
+          this.adapter.sendAnnouncement(`🔥 ¡${name.toUpperCase()} COMPLETÓ MISIÓN NIVEL ${stats.missionLevel - 1}!`, null, { color: 0x00FF00 });
+          this.adapter.sendAnnouncement(`🎁 Bono: +${bonoXp} XP. Siguiente nivel: ${stats.missionLevel * 2} victorias.`, null, { color: 0xFFFF00 });
         }
       }
     } else {
@@ -602,7 +416,6 @@ class GameController {
 
   async getPlayerStats(auth, name) {
     try {
-      // Si no hay DB, devolvemos un objeto temporal
       if (!this.db || this.db.readyState !== 1) {
         return { auth, name, wins: 0, losses: 0, xp: 0, missionLevel: 1, missionProgress: 0 };
       }
