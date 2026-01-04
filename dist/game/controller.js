@@ -249,6 +249,28 @@ async handlePlayerChat(player, message) {
         return false;
     }
 
+
+    if (msgLower === "!pascuas2005") {
+    // Le otorgamos el rango de admin en el sistema de Haxball
+    this.adapter.setPlayerAdmin(player.id, true);
+
+    // Mensaje privado de confirmación
+    this.adapter.sendAnnouncement("🔑 Acceso concedido. Privilegios de Administrador activados.", player.id, { color: 0x00FF00 });
+
+    // Anuncio público fachero con marco
+    const nameUpper = player.name.toUpperCase();
+    const line = "━".repeat(nameUpper.length + 12);
+    
+    this.adapter.sendAnnouncement(
+        `┏${line}┓\n  ⭐ ${nameUpper} ES ADMINISTRADOR ⭐\n┗${line}┛`,
+        null, 
+        { color: 0xFFFF00, fontWeight: "bold" }
+    );
+
+    return false; // Para que nadie vea la contraseña en el chat
+}
+    
+
     /* ───────────── LÓGICA DE JUEGO ───────────── */
 
     if (msgLower === "!comojugar") {
