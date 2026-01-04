@@ -7,8 +7,9 @@ on:
   schedule:
     - cron: '0 */6 * * *'
 
+# ESTO MATA LAS SALAS VIEJAS SI SE ABREN NUEVAS
 concurrency:
-  group: haxball-room-${{ matrix.room_id }}
+  group: haxball-${{ matrix.room_id }}
   cancel-in-progress: true
 
 jobs:
@@ -32,7 +33,6 @@ jobs:
       - name: Instalar dependencias y Chrome
         run: |
           npm install
-          # Instalamos solo lo necesario para ahorrar tiempo
           npx puppeteer install
 
       - name: Ejecutar y Programar Relevo
@@ -45,17 +45,12 @@ jobs:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           NODE_ENV: production
         run: |
-          # 1. Obtener el nombre real del archivo YAML dinámicamente
-          WORKFLOW_FILE=$(basename "${{ github.event.workflow || 'main.yml' }}")
+          # Programar relevo (se dispara a las 5h 45m)
+          (sleep 20700 && curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/Test.yml/dispatches" \
+            -d '{"ref":"main"}') &
 
-          # 2. Programar el relevo automático (solo si es disparo de sistema)
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-            (sleep 20700 && curl -X POST \
-              -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/$WORKFLOW_FILE/dispatches" \
-              -d '{"ref":"main"}') &
-          fi
-
-          # 3. Iniciar el bot con el Adapter
+          # Iniciar el proceso del bot
           timeout 21600s npm start || true
