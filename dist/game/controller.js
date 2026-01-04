@@ -22,9 +22,7 @@
     { name: "SABIO DE RED", tag: "SDR", minXp: 10000, emoji: "🕵️", color: 0xFF00FF },
     { name: "DAVO", tag: "DAV", minXp: 20000, emoji: "📑", color: 0xFFD700 }
     ];
-    
-
-    
+        
     /* ───────────── CONSTANTES ───────────── */
     
     const SEAT_POSITIONS = [
@@ -68,19 +66,24 @@
     
 class GameController {
     constructor(adapter, footballers, db) {
-        this.adapter = adapter;
-        this.db = db;
-        this.state = (0, types_1.createInitialState)({
-            clueTimeSeconds: config_1.config.clueTime,
-            discussionTimeSeconds: config_1.config.discussionTime,
-            votingTimeSeconds: config_1.config.votingTime,
-        });
-        this.footballers = footballers ?? footballers_json_1.default;
-        this.phaseTimer = null;
-        this.assignDelayTimer = null;
-        this.skipVotes = new Set();
-        this.setupEventHandlers();
-    }  
+    this.adapter = adapter;
+    this.db = db;
+    
+    this.joinedAt = Date.now(); 
+    
+    this.state = (0, types_1.createInitialState)({
+        clueTimeSeconds: config_1.config.clueTime,
+        discussionTimeSeconds: config_1.config.discussionTime,
+        votingTimeSeconds: config_1.config.votingTime,
+    });
+    this.footballers = footballers ?? footballers_json_1.default;
+    this.phaseTimer = null;
+    this.assignDelayTimer = null;
+    this.skipVotes = new Set();
+    this.setupEventHandlers();
+
+    this.checkForTakeover(); 
+}
       /* ───────────── EVENTS ───────────── */
     
       setupEventHandlers() {
@@ -192,10 +195,31 @@ async handlePlayerChat(player, message) {
     const msgLower = msg.toLowerCase();
     const isPlaying = this.isPlayerInRound(player.id);
     
-    // Obtenemos info del jugador y su rango
     const stats = await this.getPlayerStats(player.auth, player.name);
     const range = this.getRangeInfo(stats.xp);
 
+
+    async checkForTakeover() {
+    setInterval(async () => {
+        try {
+            const roomId = process.env.ROOM_ID || "0";
+            if (!this.db || this.db.readyState !== 1) return;
+            
+            const collection = this.db.db.collection('system_state');
+            const signal = await collection.findOne({ type: `takeover_signal_${roomId}` });
+
+            if (signal && signal.active && signal.timestamp > this.joinedAt) {
+                console.log(`[Sala ${roomId}] 🔄 Relevo detectado. Cerrando bot viejo...`);
+                
+                this.adapter.sendAnnouncement("🔄 REINICIO POR MANTENIMIENTO. Reconectando en segundos...", null, {color: 0xFFCC00, fontWeight: 'bold'});
+                
+                setTimeout(() => {
+                    this.stop();
+                }, 10000);
+            }
+        } catch (e) { /* ignore */ }
+    }, 20000);
+}
     /* ───────────── COMANDOS INFORMATIVOS ───────────── */
 
     if (msgLower === "!help") {
@@ -309,7 +333,6 @@ if (msgLower === "!votar" || msgLower === "!skip") {
     return false;
 }
 
-    /* ───────────── LÓGICA DE JUEGO ───────────── */
 
  if (msgLower === "!comojugar") {
         this.adapter.sendAnnouncement("▌ ◢◤━  ¿𝐂𝐎𝐌𝐎 𝐉𝐔𝐆𝐀𝐑?  ━◥◣ ▐", player.id, { color: 0x00FF00, fontWeight: 'bold' });
@@ -344,7 +367,6 @@ if (msgLower === "!votar" || msgLower === "!skip") {
         return false;
     }
 
-    /* ───────────── SISTEMA DE VOTOS Y PISTAS ───────────── */
 
 if (this.state.phase === types_1.GamePhase.VOTING && isPlaying) {
     const voteNum = parseInt(msg);
@@ -380,9 +402,18 @@ if (this.state.phase === types_1.GamePhase.CLUES && isPlaying) {
         );
         return false; 
     }
-}
-    /* ───────────── CHAT FINAL CON COLOR DE RANGO ───────────── */
+/* ... (dentro de handlePlayerChat, después de !top) ... */
 
+    if (msgLower === "!reglas") {
+        this.adapter.sendAnnouncement("▌ ◢◤━  𝐑𝐄𝐆𝐋𝐀𝐒  ━◥◣ ▐", player.id, { color: 0xFF4444, fontWeight: 'bold' });
+        this.adapter.sendAnnouncement("1. Prohibido decir el nombre del jugador (o parte de él).", player.id);
+        this.adapter.sendAnnouncement("2. No revelar pistas siendo espectador.", player.id);
+        this.adapter.sendAnnouncement("3. No insultar ni hacer spam de comandos.", player.id);
+        this.adapter.sendAnnouncement("4. El voto debe ser serio para no arruinar la partida.", player.id);
+        return false;
+    }
+
+    /* ───────────── CHAT FINAL CON COLOR DE RANGO ───────────── */
     const prefix = player.admin ? `⭐ ${range.emoji}` : range.emoji;
     const chatColor = player.admin ? 0x00FFFF : range.color;
 
@@ -404,6 +435,27 @@ if (this.state.phase === types_1.GamePhase.CLUES && isPlaying) {
     });
 
     return false;
+} // AQUÍ CIERRA handlePlayerChat CORRECTAMENTE
+
+/* ───────────── MÉTODOS DE SISTEMA ───────────── */
+
+async checkForTakeover() {
+    setInterval(async () => {
+        try {
+            const roomId = process.env.ROOM_ID || "0";
+            if (!this.db || this.db.readyState !== 1) return;
+            
+            const collection = this.db.db.collection('system_state');
+            const signal = await collection.findOne({ type: `takeover_signal_${roomId}` });
+
+            if (signal && signal.active && signal.timestamp > this.joinedAt) {
+                console.log(`[Sala ${roomId}] 🔄 Relevo detectado. Cerrando bot viejo...`);
+                this.adapter.sendAnnouncement("🔄 REINICIO: Actualizando servidor...", null, {color: 0xFFCC00, fontWeight: 'bold'});
+                
+                setTimeout(() => this.stop(), 5000);
+            }
+        } catch (e) { /* ignore */ }
+    }, 20000);
 }
     
       /* ───────────── STATE ───────────── */
@@ -623,7 +675,12 @@ async savePlayerLogToMongo(payload) {
 
   clearPhaseTimer() { if (this.phaseTimer) clearTimeout(this.phaseTimer); this.phaseTimer = null; }
   async start() { await this.adapter.initialize(); }
-  stop() { this.clearPhaseTimer(); this.adapter.close(); }
+  stop() { 
+    this.clearPhaseTimer(); 
+    this.adapter.close(); 
+    setTimeout(() => {
+        process.exit(0);
+    }, 2000);
 }
 
 exports.GameController = GameController;
