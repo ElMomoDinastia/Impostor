@@ -64,7 +64,7 @@ class HBRoomAdapter {
                 noPlayer: false,
                 token: (this.config.token || '').trim(),
                 public: this.config.public ?? true,
-                geo: { "code": "ar", "lat": -34.567, "lon": -58.466 + (roomNumber * 0.01) }
+                geo: { "code": "ar", "lat": -34.567, "lon": -58.466 + (roomNumber * 0.0001) }
             };
 
             const roomLink = await this.page.evaluate(async (config, isDeco) => {
