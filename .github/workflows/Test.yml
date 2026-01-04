@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 */6 * * *' # Un respaldo por si el curl falla
 
 jobs:
   deploy-room:
@@ -28,33 +28,23 @@ jobs:
       - name: Instalar dependencias y Chrome
         run: |
           npm install
-          # Nos aseguramos que Puppeteer descargue el navegador en el Action
           npx puppeteer install
 
       - name: Ejecutar y Programar Relevo
         env:
           ROOM_ID: ${{ matrix.room_id }}
-          IS_HEADER: ${{ matrix.room_id == 0 && 'true' || 'false' }}
-          IS_FOOTER: ${{ matrix.room_id == 7 && 'true' || 'false' }}
-          # MAPEO DINÁMICO: Esto crea TOKEN_0, TOKEN_1, etc., según la sala del matrix
-          TOKEN_${{ matrix.room_id }}: ${{ secrets[format('TOKEN_{0}', matrix.room_id)] }}
-          # Por compatibilidad, pasamos también el valor directo
           HAXBALL_TOKEN: ${{ secrets[format('TOKEN_{0}', matrix.room_id)] }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
           NODE_ENV: production
         run: |
-          # Escalamos el sleep para que no choquen las IPs al conectar
+          # 1. Espera inicial para no saturar IPs
           SLEEP_TIME=$((ROOM_ID * 15))
-          echo "Esperando $SLEEP_TIME segundos para iniciar Sala $ROOM_ID..."
           sleep $SLEEP_TIME
 
-          # Proceso en segundo plano para el autorelease (Keep-Alive)
-          (sleep 20400 && curl -X POST \
+          (sleep 20700 && curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/${{ github.workflow }}/dispatches \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/$(basename ${{ github.workflow }}).yml/dispatches \
             -d '{"ref":"main"}') &
-          
-          # Ejecución principal con tiempo límite de 5.9 horas aprox
-          timeout 21300s npm start || true
+          timeout 21600s npm start || true
