@@ -4,8 +4,6 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-  schedule:
-    - cron: '0 */6 * * *'
 
 jobs:
   deploy-room:
@@ -16,37 +14,34 @@ jobs:
         room_id: [0, 1, 2, 3, 4, 5, 6, 7]
 
     steps:
-      - name: Checkout del código
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Configurar Node.js
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-          cache: 'npm'
 
-      - name: Instalar dependencias y Chrome
+      - name: Install
         run: |
-          npm install
+          npm install --no-audit --no-fund
           npx puppeteer install
 
-      - name: Ejecutar y Programar Relevo
+      - name: Execute
         env:
           ROOM_ID: ${{ matrix.room_id }}
-          IS_HEADER: ${{ matrix.room_id == 0 }}
-          IS_FOOTER: ${{ matrix.room_id == 7 }}
-          HAXBALL_TOKEN: ${{ secrets[format('TOKEN_{0}', matrix.room_id)] }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MONGO_URI: ${{ secrets.MONGO_URI }}
+          HAXBALL_TOKEN: ${{ secrets[format('TOKEN_{0}', matrix.room_id)] }}
         run: |
-          # 1. Programamos el relevo a los 21000 segundos (5 horas y 50 minutos)
-          # Esto le da 10 minutos al nuevo para instalarse antes de que GitHub mate este Job.
-          (sleep 1000 && curl -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/Test.yml/dispatches" \
-            -d '{"ref":"main"}') &
+          # Solo la Sala 0 manda el relevo para evitar el bucle x8
+          if [ "${{ matrix.room_id }}" == "0" ]; then
+            (sleep 19200 && curl -X POST \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/Test.yml/dispatches" \
+              -d '{"ref":"main"}') &
+            echo "🚀 Relevo programado para las 5:20hs por Sala 0"
+          fi
 
-          # 2. El proceso actual corre hasta el límite de GitHub (6 horas = 21600s)
-          # Usamos 21540s (5h 59m) para que cierre limpio antes de que GitHub lo corte a la fuerza.
-          timeout 21540s npm start || true
+          # Ejecución del bot con límite de 6 horas
+          timeout 21540s npm start || echo "Cambio de mando exitoso"
