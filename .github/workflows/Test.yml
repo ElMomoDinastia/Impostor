@@ -14,34 +14,38 @@ jobs:
         room_id: [0, 1, 2, 3, 4, 5, 6, 7]
 
     steps:
-      - name: Checkout
+      - name: Checkout del código
         uses: actions/checkout@v3
 
-      - name: Setup Node
+      - name: Configurar Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - name: Install
+      - name: Instalar dependencias
         run: |
           npm install --no-audit --no-fund
           npx puppeteer install
 
-      - name: Execute
+      - name: Ejecutar y Relevar
         env:
           ROOM_ID: ${{ matrix.room_id }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Mantenemos tus booleanos de posición
+          IS_HEADER: ${{ matrix.room_id == 0 }}
+          IS_FOOTER: ${{ matrix.room_id == 7 }}
           HAXBALL_TOKEN: ${{ secrets[format('TOKEN_{0}', matrix.room_id)] }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
         run: |
-          # Solo la Sala 0 manda el relevo para evitar el bucle x8
+          # Solo el Header (Sala 0) tiene la llave del relevo
           if [ "${{ matrix.room_id }}" == "0" ]; then
             (sleep 19200 && curl -X POST \
               -H "Authorization: token $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/repos/${{ github.repository }}/actions/workflows/Test.yml/dispatches" \
               -d '{"ref":"main"}') &
-            echo "🚀 Relevo programado para las 5:20hs por Sala 0"
+            echo "🚀 Header detectado: Relevo programado para las 5:20hs."
           fi
 
-          # Ejecución del bot con límite de 6 horas
-          timeout 21540s npm start || echo "Cambio de mando exitoso"
+          # Ejecución con el tiempo de vida de 6 horas
+          timeout 21540s npm start || echo "Fin del ciclo para Sala ${{ matrix.room_id }}"
