@@ -10,11 +10,6 @@ on:
 jobs:
   deploy-room:
     runs-on: ubuntu-latest
-    # EL BLOQUE SE MUEVE AQUÍ ADENTRO:
-    concurrency:
-      group: haxball-${{ github.workflow }}-${{ matrix.room_id }}
-      cancel-in-progress: true
-      
     strategy:
       fail-fast: false 
       matrix:
@@ -43,14 +38,15 @@ jobs:
           HAXBALL_TOKEN: ${{ secrets[format('TOKEN_{0}', matrix.room_id)] }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
-          NODE_ENV: production
         run: |
-          # Programar relevo
-          (sleep 20700 && curl -X POST \
+          # 1. Programamos el relevo a los 21000 segundos (5 horas y 50 minutos)
+          # Esto le da 10 minutos al nuevo para instalarse antes de que GitHub mate este Job.
+          (sleep 21000 && curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/workflows/Test.yml/dispatches" \
             -d '{"ref":"main"}') &
 
-          # Iniciar el bot
-          timeout 21600s npm start || true
+          # 2. El proceso actual corre hasta el límite de GitHub (6 horas = 21600s)
+          # Usamos 21540s (5h 59m) para que cierre limpio antes de que GitHub lo corte a la fuerza.
+          timeout 21540s npm start || true
