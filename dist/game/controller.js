@@ -203,12 +203,22 @@ async handlePlayerChat(player, message) {
     const stats = await this.getPlayerStats(validAuth, validName);
     const range = this.getRangeInfo(stats.xp);
 
-    /* ───────────── COMANDOS INFORMATIVOS ───────────── */
+   /* ───────────── COMANDOS INFORMATIVOS (MEJORADO) ───────────── */
     if (msgLower === "!help") {
-        this.adapter.sendAnnouncement("▌ ◢◤━  𝐀𝐘𝐔𝐃𝐀  ━◥◣ ▐", player.id, { color: 0xFFFF00, fontWeight: 'bold' });
-        this.adapter.sendAnnouncement("» !𝐦𝐞        : 𝐕𝐞𝐫 𝐭𝐮 𝐩𝐫𝐞𝐟𝐢𝐥, 𝐫𝐚𝐧𝐠𝐨 𝐲 𝐦𝐢𝐬𝐢𝐨𝐧𝐞𝐬.", player.id);
-        this.adapter.sendAnnouncement("» !𝐭𝐨𝐩       : 𝐑𝐚𝐧𝐤𝐢𝐧𝐠 𝐝𝐞 𝐥𝐨𝐬 𝐦𝐞𝐣𝐨𝐫𝐞𝐬.", player.id);
-        this.adapter.sendAnnouncement("» !𝐫𝐚𝐧𝐠𝐨𝐬    : 𝐕𝐞𝐫 𝐭𝐨𝐝𝐚𝐬 𝐥𝐚𝐬 𝐣𝐞𝐫𝐚𝐫𝐪𝐮𝐢𝐚𝐬.", player.id);
+        // Encabezado fachero
+        this.adapter.sendAnnouncement("▌ ◢◤━  𝐀𝐘𝐔𝐃𝐀 𝐆𝐄𝐍𝐄𝐑𝐀𝐋  ━◥◣ ▐", player.id, { color: 0xFFFF00, fontWeight: 'bold' });
+        this.adapter.sendAnnouncement("👤 " + s("ᴜꜱᴜᴀʀɪᴏ"), player.id, { color: 0x00FFCC, fontWeight: 'bold' });
+        this.adapter.sendAnnouncement("» !me      : Perfil, rango y progreso de misión.", player.id);
+        this.adapter.sendAnnouncement("» !comojugar      : Te explica como jugar si sos alto pete", player.id);
+        this.adapter.sendAnnouncement("» !top     : Ranking global de los mejores (XP).", player.id);
+        this.adapter.sendAnnouncement("» !rangos  : Lista de todas las jerarquías.", player.id);     
+        this.adapter.sendAnnouncement("🎮 " + s("ᴊᴜᴇɢᴏ"), player.id, { color: 0x00FFCC, fontWeight: 'bold' });
+        this.adapter.sendAnnouncement("» !jugar   : Entrar a la lista de espera (cola).", player.id);
+        this.adapter.sendAnnouncement("» !como     : Guía rápida de roles y dinámica.", player.id);
+        this.adapter.sendAnnouncement("» !reglas  : Normas básicas de convivencia.", player.id);
+        this.adapter.sendAnnouncement("» !palabra : Te recuerda tu jugador (solo si jugás).", player.id);
+        this.adapter.sendAnnouncement("» !votar   : Votar para saltar el debate (!skip).", player.id);
+
         return false;
     }
 
