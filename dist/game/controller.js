@@ -602,24 +602,36 @@ async savePlayerLogToMongo(payload) {
 }
 
   async setupGameField() {
-    if (!this.state.currentRound) return;
+    if (!this.state.currentRound || !this.state.currentRound.clueOrder) return;
+    
     try {
-      const roundPlayerIds = [...this.state.currentRound.normalPlayerIds, this.state.currentRound.impostorId];
+      const roundPlayerIds = this.state.currentRound.clueOrder; 
+
       await this.adapter.setTeamsLock(true);
       await this.adapter.stopGame();
       await new Promise(r => setTimeout(r, 100));
+
       const allPlayers = await this.adapter.getPlayerList();
       for (const p of allPlayers) if (p.id !== 0) await this.adapter.setPlayerTeam(p.id, 0);
+      
       await new Promise(r => setTimeout(r, 100));
+
       for (const pid of roundPlayerIds) {
         await this.adapter.setPlayerTeam(pid, 1);
         await new Promise(r => setTimeout(r, 50));
       }
+
       await new Promise(r => setTimeout(r, 300));
       await this.adapter.startGame();
       await new Promise(r => setTimeout(r, 500));
+
       for (let i = 0; i < roundPlayerIds.length && i < SEAT_POSITIONS.length; i++) {
-        await this.adapter.setPlayerDiscProperties(roundPlayerIds[i], { x: SEAT_POSITIONS[i].x, y: SEAT_POSITIONS[i].y, xspeed: 0, yspeed: 0 });
+        await this.adapter.setPlayerDiscProperties(roundPlayerIds[i], { 
+          x: SEAT_POSITIONS[i].x, 
+          y: SEAT_POSITIONS[i].y, 
+          xspeed: 0, 
+          yspeed: 0 
+        });
         await new Promise(r => setTimeout(r, 100));
       }
     } catch (e) { logger_1.gameLogger.error(e); }
