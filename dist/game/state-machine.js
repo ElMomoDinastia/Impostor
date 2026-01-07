@@ -45,8 +45,7 @@ function transition(state, action) {
                 }] 
             };
         }
-
-   case 'PLAYER_LEAVE': {
+case 'PLAYER_LEAVE': {
             const playersAfterLeave = new Map(state.players);
             playersAfterLeave.delete(action.playerId);
             const queueAfterLeave = state.queue.filter(id => id !== action.playerId);
@@ -76,7 +75,7 @@ function transition(state, action) {
                     const newClueOrder = state.currentRound.clueOrder.filter(id => id !== action.playerId);
                     const newNormalIds = state.currentRound.normalPlayerIds.filter(id => id !== action.playerId);
 
-                    // Victoria del impostor si queda solo 1 civil
+                    // Victoria del impostor si queda solo 1 civil o menos
                     if (newNormalIds.length <= 1) {
                         const impId = state.currentRound.impostorId;
                         return {
@@ -84,49 +83,70 @@ function transition(state, action) {
                             sideEffects: [
                                 { type: 'CLEAR_TIMER' },
                                 { type: 'ANNOUNCE_PUBLIC', message: `💀 ${s('ᴇʟ ɪᴍᴘᴏꜱᴛᴏʀ ɢᴀɴᴀ ᴘᴏʀ ꜰᴀʟᴛᴀ ᴅᴇ ʀɪᴠᴀʟᴇꜱ')}` },
-                                { type: 'UPDATE_STATS', payload: { winners: [impId], losers: newNormalIds, winnerRole: 'IMPOSTOR' } },
+                                { type: 'UPDATE_STATS', payload: { winners: [impId], losers: [...newNormalIds], winnerRole: 'IMPOSTOR' } },
                                 { type: 'SET_PHASE_TIMER', durationSeconds: 5, nextAction: 'RESET_GAME' }
                             ]
                         };
                     }
 
-                    const currentIndex = state.currentRound.currentClueIndex;
-                    const wasHisTurn = state.currentRound.clueOrder[currentIndex] === action.playerId;
-                    
-                    const isLastNow = currentIndex >= newClueOrder.length;
-                    
-                    const nextIndex = isLastNow ? 0 : currentIndex;
-
                     const newRound = {
                         ...state.currentRound,
                         clueOrder: newClueOrder,
-                        normalPlayerIds: newNormalIds,
-                        currentClueIndex: nextIndex
+                        normalPlayerIds: newNormalIds
                     };
 
-                    if (wasHisTurn) {
-                        if (isLastNow) {
+                    // --- MANEJO POR FASES ---
+
+                    // A. SI ESTÁN EN PISTAS
+                    if (state.phase === types_1.GamePhase.CLUES) {
+                        const currentIndex = state.currentRound.currentClueIndex;
+                        const wasHisTurn = state.currentRound.clueOrder[currentIndex] === action.playerId;
+                        const isLastNow = currentIndex >= newClueOrder.length;
+                        const nextIndex = isLastNow ? 0 : currentIndex;
+                        
+                        newRound.currentClueIndex = nextIndex;
+
+                        if (wasHisTurn) {
+                            if (isLastNow) {
+                                return {
+                                    state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, phase: types_1.GamePhase.DISCUSSION, currentRound: newRound },
+                                    sideEffects: [
+                                        { type: 'ANNOUNCE_PUBLIC', message: `🏃 ${s('ᴇʟ ᴜʟᴛɪᴍᴏ ᴊᴜɢᴀᴅᴏʀ ꜱᴇ ꜰᴜᴇ')}.` },
+                                        { type: 'ANNOUNCE_PUBLIC', message: `🗣️ ${s('ᴘᴀꜱᴀɴᴅᴏ ᴀʟ ᴅᴇʙᴀᴛᴇ')}...` },
+                                        { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.discussionTimeSeconds }
+                                    ]
+                                };
+                            }
+                            const nextPlayer = state.players.get(newClueOrder[nextIndex]);
                             return {
-                                state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, phase: types_1.GamePhase.DISCUSSION, currentRound: newRound },
+                                state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, currentRound: newRound },
                                 sideEffects: [
-                                    { type: 'ANNOUNCE_PUBLIC', message: `🏃 ${s('ᴇʟ ᴜʟᴛɪᴍᴏ ᴊᴜɢᴀᴅᴏʀ ꜱᴇ ꜰᴜᴇ')}.` },
-                                    { type: 'ANNOUNCE_PUBLIC', message: `🗣️ ${s('ᴘᴀꜱᴀɴᴅᴏ ᴀʟ ᴅᴇʙᴀᴛᴇ')}...`, style: { color: 0xFF9900 } },
-                                    { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.discussionTimeSeconds }
+                                    { type: 'ANNOUNCE_PUBLIC', message: `⚠️ ${s('ᴇʀᴀ ᴛᴜʀɴᴏ ᴅᴇ ᴀʟɢᴜɪᴇɴ ǫᴜᴇ ꜱᴇ ꜰᴜᴇ')}.` },
+                                    { type: 'ANNOUNCE_PUBLIC', message: `🔔 ${s('ᴛᴜʀɴᴏ ᴅᴇ')}: ${nextPlayer?.name.toUpperCase()}` },
+                                    { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.clueTimeSeconds }
                                 ]
                             };
                         }
-                        
-                        const nextPlayer = state.players.get(newClueOrder[nextIndex]);
-                        return {
-                            state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, currentRound: newRound },
-                            sideEffects: [
-                                { type: 'ANNOUNCE_PUBLIC', message: `⚠️ ${s('ᴇʀᴀ ᴛᴜʀɴᴏ ᴅᴇ ᴀʟɢᴜɪᴇɴ ǫᴜᴇ ꜱᴇ ꜰᴜᴇ')}.` },
-                                { type: 'ANNOUNCE_PUBLIC', message: `🔔 ${s('ᴛᴜʀɴᴏ ᴅᴇ')}: ${nextPlayer?.name.toUpperCase()}`, style: { color: 0xFFFF00 } },
-                                { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.clueTimeSeconds }
-                            ]
-                        };
                     }
 
+                    // B. SI ESTÁN EN VOTACIÓN
+                    if (state.phase === types_1.GamePhase.VOTING) {
+                        const newVotes = new Map(state.currentRound.votes);
+                        newVotes.delete(action.playerId); 
+                        
+                        if (newVotes.size >= newClueOrder.length) {
+                            return {
+                                ...handleEndVoting({ 
+                                    ...state, 
+                                    players: playersAfterLeave, 
+                                    queue: queueAfterLeave, 
+                                    currentRound: { ...newRound, votes: newVotes } 
+                                }),
+                            };
+                        }
+                    }
+
+                    // C. OTROS CASOS (Debate, etc)
                     return { 
                         state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, currentRound: newRound },
                         sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message: `⚠️ ${s('ᴜɴ ɪɴᴏᴄᴇɴᴛᴇ ᴀʙᴀɴᴅᴏɴᴏ')}.` }] 
