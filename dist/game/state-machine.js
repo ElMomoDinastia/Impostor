@@ -46,7 +46,7 @@ function transition(state, action) {
             };
         }
 
-      case 'PLAYER_LEAVE': {
+   case 'PLAYER_LEAVE': {
             const playersAfterLeave = new Map(state.players);
             playersAfterLeave.delete(action.playerId);
             const queueAfterLeave = state.queue.filter(id => id !== action.playerId);
@@ -56,7 +56,7 @@ function transition(state, action) {
                                  state.phase !== types_1.GamePhase.REVEAL;
 
             if (isGameActive) {
-                // 1. SI SE VA EL IMPOSTOR (Victoria Civil inmediata)
+                // 1. SI SE VA EL IMPOSTOR
                 if (action.playerId === state.currentRound.impostorId) {
                     const winners = state.currentRound.clueOrder.filter(id => id !== action.playerId);
                     return {
@@ -65,59 +65,76 @@ function transition(state, action) {
                             { type: 'CLEAR_TIMER' },
                             { type: 'ANNOUNCE_PUBLIC', message: `🏃 ${s('ᴇʟ ɪᴍᴘᴏꜱᴛᴏʀ ᴀʙᴀɴᴅᴏɴᴏ ʟᴀ ᴘᴀʀᴛɪᴅᴀ')}...` },
                             { type: 'ANNOUNCE_PUBLIC', message: `🏆 ${s('ᴠɪᴄᴛᴏʀɪᴀ ᴘᴀʀᴀ ʟᴏꜱ ɪɴᴏᴄᴇɴᴛᴇꜱ')}`, style: { color: 0x00FF00, fontWeight: 'bold' } },
-                            { 
-                                type: 'UPDATE_STATS', 
-                                payload: { winners, losers: [], winnerRole: 'CIVIL' } 
-                            },
+                            { type: 'UPDATE_STATS', payload: { winners, losers: [], winnerRole: 'CIVIL' } },
                             { type: 'SET_PHASE_TIMER', durationSeconds: 5, nextAction: 'RESET_GAME' }
                         ]
                     };
                 }
 
-                // 2. SI SE VA UN INOCENTE QUE ESTABA JUGANDO
+                // 2. SI SE VA UN INOCENTE JUGANDO
                 if (state.currentRound.clueOrder.includes(action.playerId)) {
                     const newClueOrder = state.currentRound.clueOrder.filter(id => id !== action.playerId);
                     const newNormalIds = state.currentRound.normalPlayerIds.filter(id => id !== action.playerId);
 
-                    // --- LÓGICA DE VICTORIA POR ABANDONO ---
-                    // Si al irse queda 1 solo inocente vivo (o ninguno), el impostor gana automáticamente
+                    // Victoria del impostor si queda solo 1 civil
                     if (newNormalIds.length <= 1) {
                         const impId = state.currentRound.impostorId;
                         return {
                             state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, phase: types_1.GamePhase.REVEAL },
                             sideEffects: [
                                 { type: 'CLEAR_TIMER' },
-                                { type: 'ANNOUNCE_PUBLIC', message: `⚠️ ${s('ᴜɴ ɪɴᴏᴄᴇɴᴛᴇ ꜱᴇ ꜰᴜᴇ')}...` },
-                                { type: 'ANNOUNCE_PUBLIC', message: `💀 ${s('ᴇʟ ɪᴍᴘᴏꜱᴛᴏʀ ɢᴀɴᴀ ᴘᴏʀ ꜰᴀʟᴛᴀ ᴅᴇ ʀɪᴠᴀʟᴇꜱ')}`, style: { color: 0xFF0000, fontWeight: 'bold' } },
-                                { 
-                                    type: 'UPDATE_STATS', 
-                                    payload: { winners: [impId], losers: newNormalIds, winnerRole: 'IMPOSTOR' } 
-                                },
+                                { type: 'ANNOUNCE_PUBLIC', message: `💀 ${s('ᴇʟ ɪᴍᴘᴏꜱᴛᴏʀ ɢᴀɴᴀ ᴘᴏʀ ꜰᴀʟᴛᴀ ᴅᴇ ʀɪᴠᴀʟᴇꜱ')}` },
+                                { type: 'UPDATE_STATS', payload: { winners: [impId], losers: newNormalIds, winnerRole: 'IMPOSTOR' } },
                                 { type: 'SET_PHASE_TIMER', durationSeconds: 5, nextAction: 'RESET_GAME' }
                             ]
                         };
                     }
 
-                    // SI LA PARTIDA SIGUE: Actualizamos la ronda para que no haya undefined
+                    const currentIndex = state.currentRound.currentClueIndex;
+                    const wasHisTurn = state.currentRound.clueOrder[currentIndex] === action.playerId;
+                    
+                    const isLastNow = currentIndex >= newClueOrder.length;
+                    
+                    const nextIndex = isLastNow ? 0 : currentIndex;
+
                     const newRound = {
                         ...state.currentRound,
                         clueOrder: newClueOrder,
                         normalPlayerIds: newNormalIds,
-                        currentClueIndex: Math.min(state.currentRound.currentClueIndex, newClueOrder.length - 1)
+                        currentClueIndex: nextIndex
                     };
 
+                    if (wasHisTurn) {
+                        if (isLastNow) {
+                            return {
+                                state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, phase: types_1.GamePhase.DISCUSSION, currentRound: newRound },
+                                sideEffects: [
+                                    { type: 'ANNOUNCE_PUBLIC', message: `🏃 ${s('ᴇʟ ᴜʟᴛɪᴍᴏ ᴊᴜɢᴀᴅᴏʀ ꜱᴇ ꜰᴜᴇ')}.` },
+                                    { type: 'ANNOUNCE_PUBLIC', message: `🗣️ ${s('ᴘᴀꜱᴀɴᴅᴏ ᴀʟ ᴅᴇʙᴀᴛᴇ')}...`, style: { color: 0xFF9900 } },
+                                    { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.discussionTimeSeconds }
+                                ]
+                            };
+                        }
+                        
+                        const nextPlayer = state.players.get(newClueOrder[nextIndex]);
+                        return {
+                            state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, currentRound: newRound },
+                            sideEffects: [
+                                { type: 'ANNOUNCE_PUBLIC', message: `⚠️ ${s('ᴇʀᴀ ᴛᴜʀɴᴏ ᴅᴇ ᴀʟɢᴜɪᴇɴ ǫᴜᴇ ꜱᴇ ꜰᴜᴇ')}.` },
+                                { type: 'ANNOUNCE_PUBLIC', message: `🔔 ${s('ᴛᴜʀɴᴏ ᴅᴇ')}: ${nextPlayer?.name.toUpperCase()}`, style: { color: 0xFFFF00 } },
+                                { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.clueTimeSeconds }
+                            ]
+                        };
+                    }
+
                     return { 
-                        state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, currentRound: newRound }, 
-                        sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message: `⚠️ ${s('ᴜɴ ɪɴᴏᴄᴇɴᴛᴇ ᴀʙᴀɴᴅᴏɴᴏ')}. ${s('ǫᴜᴇᴅᴀɴ')} ${newNormalIds.length} ${s('ᴄɪᴠɪʟᴇꜱ')}.` }] 
+                        state: { ...state, players: playersAfterLeave, queue: queueAfterLeave, currentRound: newRound },
+                        sideEffects: [{ type: 'ANNOUNCE_PUBLIC', message: `⚠️ ${s('ᴜɴ ɪɴᴏᴄᴇɴᴛᴇ ᴀʙᴀɴᴅᴏɴᴏ')}.` }] 
                     };
                 }
             }
 
-            // Si se va alguien que no estaba en la ronda activa (espectador o en fila)
-            return { 
-                state: { ...state, players: playersAfterLeave, queue: queueAfterLeave }, 
-                sideEffects: [] 
-            };
+            return { state: { ...state, players: playersAfterLeave, queue: queueAfterLeave }, sideEffects: [] };
         }
 
         case 'JOIN_QUEUE': {
