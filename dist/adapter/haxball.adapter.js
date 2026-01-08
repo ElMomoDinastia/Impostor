@@ -113,6 +113,14 @@ class HBRoomAdapter {
         await this.page?.evaluate((i, p) => window.__haxRoom?.setPlayerDiscProperties(i, p), id, props);
     }
 
+    async clearBans() { 
+    await this.page?.evaluate(() => window.__haxRoom?.clearBans()); 
+}
+
+async kickPlayer(id, reason, ban) {
+    await this.page?.evaluate((i, r, b) => window.__haxRoom?.kickPlayer(i, r, b), id, reason, ban);
+}
+
     async sendChat(msg, id) { await this.page?.evaluate((m, i) => window.__haxRoom?.sendChat(m, i), msg, id); }
     async sendAnnouncement(msg, tid, opts) { 
         await this.page?.evaluate((m, t, c, s) => window.__haxRoom?.sendAnnouncement(m, t, c, s), 
