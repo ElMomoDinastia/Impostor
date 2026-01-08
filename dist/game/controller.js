@@ -80,7 +80,7 @@ class GameController {
     this.assignDelayTimer = null;
     this.skipVotes = new Set();
     this.setupEventHandlers();
-
+    this.startDiscordAdvertisement(); 
     this.checkForTakeover(); 
 }
       /* ───────────── EVENTS ───────────── */
@@ -102,7 +102,21 @@ class GameController {
         });
       }
     
-      handlePlayerJoin(player) {
+    handlePlayerJoin(player) {
+        // 🛡️ --- SISTEMA ANTI-MULTIS ---
+        // Obtenemos todos los jugadores que ya están en el estado del bot
+        const allPlayers = Array.from(this.state.players.values());
+        
+        // Buscamos si alguno tiene el mismo AUTH o el mismo CONN
+        const isMulti = allPlayers.find(p => p.auth === player.auth || p.conn === player.conn);
+
+        if (isMulti) {
+            this.adapter.kickPlayer(player.id, "❌ ANTI-MULTI: Ya hay una cuenta activa con tus datos.", false);
+            console.log(`[SEGURIDAD] Intento de multi bloqueado: ${player.name} | Auth: ${player.auth}`);
+            return; // Detenemos la ejecución para que no se sume a la partida
+        }
+        // ------------------------------
+
         const gamePlayer = {
           id: player.id,
           name: player.name,
@@ -128,7 +142,7 @@ class GameController {
         });
     
         this.applyTransition(result);
-          this.checkAutoStart();
+        this.checkAutoStart();
       }
     
       handlePlayerLeave(player) {
@@ -155,7 +169,6 @@ class GameController {
             type: "START_GAME",
             footballers: this.footballers,
         });
-        // a ver si chatgpt tiene razon en esto y me caga... 
         this.applyTransition(result);
         if (this.state.phase === types_1.GamePhase.ASSIGN) {
             console.log("Forzando setup del campo...");
@@ -212,6 +225,7 @@ async handlePlayerChat(player, message) {
         this.adapter.sendAnnouncement("» !comojugar      : Te explica como jugar si sos alto pete", player.id);
         this.adapter.sendAnnouncement("» !top     : Ranking global de los mejores (XP).", player.id);
         this.adapter.sendAnnouncement("» !rangos  : Lista de todas las jerarquías.", player.id);     
+        this.adapter.sendAnnouncement("» !discord : Puedes ver el link de discord (!discord).", player.id);
         this.adapter.sendAnnouncement("🎮 " + s("ᴊᴜᴇɢᴏ"), player.id, { color: 0x00FFCC, fontWeight: 'bold' });
         this.adapter.sendAnnouncement("» !jugar   : Entrar a la lista de espera (cola).", player.id);
         this.adapter.sendAnnouncement("» !como     : Guía rápida de roles y dinámica.", player.id);
@@ -221,6 +235,86 @@ async handlePlayerChat(player, message) {
 
         return false;
     }
+
+
+    if (msgLower === "!discord") {
+    const title = "ᴜɴɪᴛᴇ ᴀʟ ᴅɪꜱᴄᴏʀᴅ";
+    const discordLink = "dsc.gg/Impostores";
+
+    this.adapter.sendAnnouncement(
+        `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n  💙 ${s(title)}\n  🔗 ${discordLink}\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛`,
+        player.id, 
+        { color: 0x5865F2, fontWeight: "bold" }
+    );
+    return false;
+    }
+
+
+  /* ───────────── COMANDOS DE ADMINISTRACIÓN ───────────── */
+
+if (msgLower === "!start" || msgLower === "!forzar") {
+    if (!player.admin) {
+        this.adapter.sendAnnouncement("❌ No tenés permisos para forzar el inicio.", player.id, { color: 0xFF4444 });
+        return false;
+    }
+    if (this.state.phase !== types_1.GamePhase.WAITING) {
+        this.adapter.sendAnnouncement("⚠️ La partida ya está en curso.", player.id, { color: 0xFFFF00 });
+        return false;
+    }
+    if (this.state.queue.length === 0) {
+        this.adapter.sendAnnouncement("🚫 No hay nadie en cola.", player.id, { color: 0xFF4444 });
+        return false;
+    }
+
+    this.adapter.sendAnnouncement(`🛠️ ${player.name.toUpperCase()} FORZÓ EL INICIO.`, null, { color: 0xFFFF00, fontWeight: 'bold' });
+    const result = (0, state_machine_1.transition)(this.state, { type: "START_GAME", footballers: this.footballers });
+    this.applyTransition(result);
+    if (this.state.phase === types_1.GamePhase.ASSIGN) this.setupGameField();
+    return false;
+}
+
+if (msgLower === "!stop" || msgLower === "!cancelar") {
+    if (!player.admin) {
+        this.adapter.sendAnnouncement("❌ No podés detener la partida.", player.id, { color: 0xFF4444 });
+        return false;
+    }
+    
+    this.adapter.sendAnnouncement("🛑 PARTIDA CANCELADA POR EL ADMIN", null, { color: 0xFF0000, fontWeight: 'bold' });
+    
+    this.adapter.stopGame();
+    this.adapter.setTeamsLock(false);
+    
+    const allPlayers = await this.adapter.getPlayerList();
+    for (const p of allPlayers) {
+        if (p.id !== 0) await this.adapter.setPlayerTeam(p.id, 0);
+    }
+
+    // Reiniciamos el estado del controlador
+    this.state.phase = types_1.GamePhase.WAITING;
+    this.state.currentRound = null;
+    this.clearPhaseTimer();
+    
+    return false;
+}
+
+
+if (msgLower === "!clearbans" || msgLower === "!unbanall") {
+    if (!player.admin) {
+        this.adapter.sendAnnouncement("❌ No tenés permisos para limpiar los baneos.", player.id, { color: 0xFF4444 });
+        return false;
+    }
+
+    this.adapter.clearBans();
+    
+    announceBox(this.adapter, { 
+        title: "BANEOS LIMPIADOS", 
+        emoji: "🔓", 
+        color: 0x00FF00 
+    });
+
+    console.log(`[ADMIN] ${player.name} limpió la lista de baneos.`);
+    return false;
+}
 
     if (msgLower === "!me") {
         const filled = Math.floor(range.percent / 10);
@@ -589,6 +683,19 @@ async getTopPlayers(limit) {
     } catch (e) {
         return [];
     }
+}
+
+startDiscordAdvertisement() {
+    setInterval(() => {
+        const discordLink = "dsc.gg/Impostores";
+        const title = "ᴜɴɪᴛᴇ ᴀʟ ᴅɪꜱᴄᴏʀᴅ";
+        
+        this.adapter.sendAnnouncement(
+            `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n  💙 ${s(title)}\n  🔗 ${discordLink}\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛`,
+            null, // null para que lo vean todos
+            { color: 0x5865F2, fontWeight: "bold" } // Azul desenfocado (Blurple) original de Discord
+        );
+    }, 180000);
 }
 
 async savePlayerLogToMongo(payload) {
