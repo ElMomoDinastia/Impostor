@@ -220,8 +220,12 @@ async start() {
 
     console.log("[GameController] start()");
 
-    // No inicia la sala, SOLO marca estado
-    // Ideal para logs, anuncios iniciales, métricas, etc.
+    if (!this.adapter || typeof this.adapter.init !== "function") {
+        throw new Error("❌ Adapter no tiene método init()");
+    }
+   console.log("Adapter methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.adapter)));
+
+    await this.adapter.init(); // 👈 ACÁ se crea la sala
 }
 
 stop() {
