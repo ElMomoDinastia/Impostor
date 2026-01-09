@@ -884,15 +884,21 @@ async sendDiscordReplay(url, word) {
 }
 
 clearPhaseTimer() { 
-    if (this.phaseTimer) {
-        console.log("[TIMER_CLEAR] Cronómetro detenido.");
-        clearTimeout(this.phaseTimer); 
+        if (this.phaseTimer) {
+            console.log("[TIMER_CLEAR] Cronómetro detenido.");
+            clearTimeout(this.phaseTimer); 
+        }
+        this.phaseTimer = null; 
     }
-    this.phaseTimer = null; 
+
+    start() {
+        console.log("🚀 GameController: Sistema iniciado y escuchando eventos.");
     }
-}
 
-exports.GameController = GameController;
-
+    stop() {
+        console.log("🛑 GameController: Deteniendo procesos y timers...");
+        this.clearPhaseTimer();
+    }
+} 
 
 exports.GameController = GameController;
