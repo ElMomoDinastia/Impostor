@@ -212,14 +212,26 @@ case 'PLAYER_LEAVE': {
                 sideEffects: effects 
             };
         }
-
-        case 'SUBMIT_CLUE': {
+case 'SUBMIT_CLUE': {
             const rClue = state.currentRound;
-            if (!rClue || state.phase !== types_1.GamePhase.CLUES) return { state, sideEffects: [] };
-            if (rClue.clues.has(action.playerId)) return { state, sideEffects: [] };
+            
+            // LOG DE ENTRADA: Para saber quién intentó hablar y en qué fase está el bot
+            console.log(`[SUBMIT_CLUE] Intento de ID: ${action.playerId} | Fase Actual: ${state.phase} | Index: ${rClue?.currentClueIndex}`);
+
+            if (!rClue || state.phase !== types_1.GamePhase.CLUES) {
+                console.log(`[SUBMIT_CLUE] Rechazado: Fase incorrecta o sin ronda.`);
+                return { state, sideEffects: [] };
+            }
+            
+            if (rClue.clues.has(action.playerId)) {
+                console.log(`[SUBMIT_CLUE] Rechazado: El ID ${action.playerId} ya envió pista.`);
+                return { state, sideEffects: [] };
+            }
             
             const newClues = new Map(rClue.clues).set(action.playerId, action.clue);
             const isLastClue = rClue.currentClueIndex >= rClue.clueOrder.length - 1;
+            
+            console.log(`[SUBMIT_CLUE] Pista aceptada. ¿Es la última?: ${isLastClue}`);
             
             if (isLastClue) {
                 const effects = [
@@ -236,6 +248,8 @@ case 'PLAYER_LEAVE': {
                 effects.push({ type: 'ANNOUNCE_PUBLIC', message: `🗣️ ${s('ᴅᴇʙᴀᴛᴇ ɪɴɪᴄɪᴀᴅᴏ')} (${state.settings.discussionTimeSeconds}ꜱ)`, style: { color: 0xFF9900, fontWeight: "bold" } });
                 effects.push({ type: 'SET_PHASE_TIMER', durationSeconds: state.settings.discussionTimeSeconds });
 
+                console.log(`[SUBMIT_CLUE] Transicionando a DISCUSSION...`);
+
                 return { 
                     state: { ...state, phase: types_1.GamePhase.DISCUSSION, currentRound: { ...rClue, clues: newClues } }, 
                     sideEffects: effects
@@ -244,6 +258,8 @@ case 'PLAYER_LEAVE': {
 
             const nextIndex = rClue.currentClueIndex + 1;
             const nextPlayer = state.players.get(rClue.clueOrder[nextIndex]);
+            
+            console.log(`[SUBMIT_CLUE] Pasando al siguiente index: ${nextIndex}. Turno de: ${nextPlayer?.name}`);
 
             return { 
                 state: { ...state, currentRound: { ...rClue, clues: newClues, currentClueIndex: nextIndex } }, 
@@ -309,13 +325,19 @@ case 'PLAYER_LEAVE': {
  */
 function handleEndVoting(state) {
     const round = state.currentRound;
-    if (!round) return { state, sideEffects: [] };
+    if (!round) {
+        console.log("[DEBUG-VOTE] Error: No hay ronda activa al intentar finalizar votación.");
+        return { state, sideEffects: [] };
+    }
 
     const counts = {};
     round.votes.forEach(v => counts[v] = (counts[v] || 0) + 1);
     const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
     
+    console.log("[DEBUG-VOTE] Conteo final de votos:", counts);
+
     if (sorted.length === 0) {
+        console.log("[DEBUG-VOTE] Resultado: Nadie votó.");
         return { 
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
             sideEffects: [
@@ -327,10 +349,14 @@ function handleEndVoting(state) {
 
     const votedOutId = parseInt(sorted[0]); 
     const isImpostor = votedOutId === round.impostorId;
-    const votedName = (state.players.get(votedOutId)?.name || "Alguien").toUpperCase();
+    const votedPlayer = state.players.get(votedOutId);
+    const votedName = (votedPlayer?.name || "Alguien").toUpperCase();
+
+    console.log(`[DEBUG-VOTE] Ganador votos ID: ${votedOutId} (${votedName}). ¿Es Impostor?: ${isImpostor}`);
 
     // VICTORIA CIVILES: El Impostor es votado
     if (isImpostor) {
+        console.log("[DEBUG-VOTE] Camino: Victoria Inocentes.");
         return { 
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
             sideEffects: [
@@ -354,9 +380,11 @@ function handleEndVoting(state) {
     } 
 
     const remainingInnocents = round.normalPlayerIds.filter(id => id !== votedOutId);
+    console.log(`[DEBUG-VOTE] Inocentes restantes tras eliminación: ${remainingInnocents.length}`);
     
     // VICTORIA IMPOSTOR: Queda solo 1 inocente
     if (remainingInnocents.length <= 1) {
+        console.log("[DEBUG-VOTE] Camino: Victoria Impostor.");
         const impName = (state.players.get(round.impostorId)?.name || "Impostor").toUpperCase();
         return { 
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
@@ -381,6 +409,7 @@ function handleEndVoting(state) {
     }
 
     // EL JUEGO SIGUE: El votado era inocente pero quedan más de 1
+    console.log("[DEBUG-VOTE] Camino: El juego sigue, nueva ronda de pistas.");
     const nextClueOrder = round.clueOrder.filter(id => id !== votedOutId);
     const firstPlayerName = (state.players.get(nextClueOrder[0])?.name || "---").toUpperCase();
 
@@ -402,8 +431,14 @@ function handleEndVoting(state) {
 }
 
 function transitionToClues(state) {
-    if (!state.currentRound || !state.currentRound.clueOrder.length) return { state, sideEffects: [] };
+    console.log("[DEBUG-PHASE] Ejecutando transitionToClues...");
+    if (!state.currentRound || !state.currentRound.clueOrder.length) {
+        console.log("[DEBUG-PHASE] Abortando pistas: No hay orden de jugadores.");
+        return { state, sideEffects: [] };
+    }
     const first = state.players.get(state.currentRound.clueOrder[0]);
+    console.log(`[DEBUG-PHASE] Primera pista para: ${first?.name} (ID: ${state.currentRound.clueOrder[0]})`);
+    
     return { 
         state: { ...state, phase: types_1.GamePhase.CLUES }, 
         sideEffects: [
