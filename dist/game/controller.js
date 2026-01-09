@@ -5,7 +5,9 @@
     };
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.GameController = void 0;
-    
+    // Solo si usas Node < 18
+    const fetch = require('node-fetch');
+    const FormData = require('form-data');
     const types_1 = require("../game/types");
     const state_machine_1 = require("../game/state-machine");
     const logger_1 = require("../utils/logger");
@@ -67,6 +69,12 @@ class GameController {
     constructor(adapter, footballers, db) {
     this.adapter = adapter;
     this.db = db;
+    this.gameInProgress = false;
+    this.REPLAY_CONFIG = {
+        WEBHOOK_URL: "https://discord.com/api/webhooks/1458993146875744450/te393zGaoUsorJ9bqEJOMbP3Cdu-cmSf5IunSFDS_P28uOf12r8xx_0czIdG408jjU-7",
+        TENANT_KEY: "ut_bdc8b4f6c92b89fbe1a38e060a2736ff,
+        API_KEY: "ukt_ea85896143d3de1854e7f1c3db2d933a"
+    };
     
     this.joinedAt = Date.now(); 
     
@@ -530,30 +538,44 @@ async checkForTakeover() {
     
       /* ───────────── STATE ───────────── */
     
-      applyTransition(result) {
+    applyTransition(result) {
     const prev = this.state.phase;
     this.state = result.state;
+
+    
+    if (prev === types_1.GamePhase.WAITING && this.state.phase === types_1.GamePhase.ASSIGN) {
+        this.adapter.startRecording();
+        this.gameInProgress = true;
+        console.log("🎥 [REPLAY] Iniciando grabación...");
+    }
+
+    if (this.gameInProgress && (this.state.phase === types_1.GamePhase.REVEAL || (prev !== types_1.GamePhase.WAITING && this.state.phase === types_1.GamePhase.WAITING))) {
+        this.gameInProgress = false;
+        console.log("🎬 [REPLAY] Partida terminada. Procesando video...");
+        setTimeout(() => this.handleReplayUpload(), 2000);
+    }
+    // ---------------------------
 
     if (prev !== this.state.phase) {
         this.skipVotes.clear();
     }
     
-        if (prev === types_1.GamePhase.VOTING && this.state.phase === types_1.GamePhase.CLUES) {
-          announceBox(this.adapter, { title: "preparando ronda", emoji: "⌛", color: 0xCCCCCC });
-          setTimeout(() => { this.executeSideEffects(result.sideEffects); }, 2000);
-          return;
-        }
-    
-        this.executeSideEffects(result.sideEffects);
-    
-        if (this.state.phase === types_1.GamePhase.ASSIGN && !this.assignDelayTimer) {
-          this.setupGameField();
-          this.assignDelayTimer = setTimeout(() => {
+    if (prev === types_1.GamePhase.VOTING && this.state.phase === types_1.GamePhase.CLUES) {
+        announceBox(this.adapter, { title: "preparando ronda", emoji: "⌛", color: 0xCCCCCC });
+        setTimeout(() => { this.executeSideEffects(result.sideEffects); }, 2000);
+        return;
+    }
+
+    this.executeSideEffects(result.sideEffects);
+
+    if (this.state.phase === types_1.GamePhase.ASSIGN && !this.assignDelayTimer) {
+        this.setupGameField();
+        this.assignDelayTimer = setTimeout(() => {
             this.assignDelayTimer = null;
             this.applyTransition((0, state_machine_1.transitionToClues)(this.state));
-          }, 3000);
-        }
-      }
+        }, 3000);
+    }
+}
     
       /* ───────────── SIDE EFFECTS ───────────── */
     
@@ -725,6 +747,59 @@ async savePlayerLogToMongo(payload) {
     } catch (e) {
         logger_1.gameLogger.error("Error guardando log:", e);
     }
+}
+
+async handleReplayUpload() {
+    try {
+        const replayArray = await this.adapter.stopRecording();
+        if (!replayArray || replayArray.length === 0) return;
+
+        // Convertimos el Array que viene de Puppeteer a un Buffer de Node.js
+        const replayBuffer = Buffer.from(replayArray);
+        const footballerName = this.state.currentRound?.footballer || "Desconocido";
+
+        const formData = new FormData();
+        formData.append("replay[name]", `Impostor: ${footballerName.toUpperCase()}`);
+        formData.append("replay[private]", "false");
+        // Importante: Usamos Blob para que el fetch lo trate como archivo binario
+        formData.append("replay[fileContent]", new Blob([replayBuffer]), "replay.hbr");
+
+        const response = await fetch("https://replay.thehax.pl/api/upload", {
+            method: "POST",
+            headers: {
+                "API-Tenant": this.REPLAY_CONFIG.TENANT_KEY,
+                "API-Key": this.REPLAY_CONFIG.API_KEY,
+            },
+            body: formData,
+        });
+
+        const res = await response.json();
+        if (res.success) {
+            this.adapter.sendAnnouncement(`✅ REPLAY SUBIDO: ${res.url}`, null, { color: 0x00FFCC, fontWeight: 'bold' });
+            this.sendDiscordReplay(res.url, footballerName);
+        }
+    } catch (e) {
+        console.error("❌ Error subiendo replay:", e);
+    }
+}
+
+async sendDiscordReplay(url, word) {
+    const embed = {
+        username: "Impostor Bot Replays",
+        embeds: [{
+            title: "🎬 Nueva Partida Grabada",
+            description: `⚽ **Jugador:** ${word.toUpperCase()}\n🔗 [Ver Repetición](${url})`,
+            color: 0x00FFCC,
+            timestamp: new Date().toISOString(),
+            footer: { text: "dsc.gg/impostores" }
+        }]
+    };
+
+    fetch(this.REPLAY_CONFIG.WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(embed)
+    }).catch(err => console.error("Error Discord Webhook:", err));
 }
 
   async setupGameField() {
