@@ -75,6 +75,8 @@ class GameController {
         TENANT_KEY: "ut_bdc8b4f6c92b89fbe1a38e060a2736ff",
         API_KEY: "ukt_ea85896143d3de1854e7f1c3db2d933a"
     };
+
+
     
     this.joinedAt = Date.now(); 
     
@@ -207,6 +209,39 @@ getRangeInfo(xp) {
     }
 
     return { ...current, percent, nextXP: next ? next.minXp : xp, hasNext: !!next };
+}
+
+
+    /* ───────────── LIFECYCLE ───────────── */
+
+async start() {
+    if (this.started) return;
+    this.started = true;
+
+    console.log("[GameController] start()");
+
+    // No inicia la sala, SOLO marca estado
+    // Ideal para logs, anuncios iniciales, métricas, etc.
+}
+
+stop() {
+    if (!this.started) return;
+    this.started = false;
+
+    console.log("[GameController] stop()");
+
+    // Limpiezas seguras
+    this.clearPhaseTimer();
+    if (this.assignDelayTimer) {
+        clearTimeout(this.assignDelayTimer);
+        this.assignDelayTimer = null;
+    }
+
+    // Opcional pero recomendado
+    try {
+        this.adapter.stopGame();
+        this.adapter.setTeamsLock(false);
+    } catch (_) {}
 }
 
 /* ───────────── MANEJADOR DE CHAT ───────────── */
