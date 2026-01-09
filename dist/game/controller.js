@@ -891,14 +891,4 @@ clearPhaseTimer() {
         this.phaseTimer = null; 
     }
 
-    start() {
-        console.log("🚀 GameController: Sistema iniciado y escuchando eventos.");
-    }
-
-    stop() {
-        console.log("🛑 GameController: Deteniendo procesos y timers...");
-        this.clearPhaseTimer();
-    }
-} 
-
 exports.GameController = GameController;
