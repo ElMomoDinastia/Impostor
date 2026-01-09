@@ -72,7 +72,7 @@ class GameController {
     this.gameInProgress = false;
     this.REPLAY_CONFIG = {
         WEBHOOK_URL: "https://discord.com/api/webhooks/1458993146875744450/te393zGaoUsorJ9bqEJOMbP3Cdu-cmSf5IunSFDS_P28uOf12r8xx_0czIdG408jjU-7",
-        TENANT_KEY: "ut_bdc8b4f6c92b89fbe1a38e060a2736ff,
+        TENANT_KEY: "ut_bdc8b4f6c92b89fbe1a38e060a2736ff",
         API_KEY: "ukt_ea85896143d3de1854e7f1c3db2d933a"
     };
     
@@ -752,23 +752,32 @@ async savePlayerLogToMongo(payload) {
 async handleReplayUpload() {
     try {
         const replayArray = await this.adapter.stopRecording();
-        if (!replayArray || replayArray.length === 0) return;
+        // Validamos que la grabación tenga contenido (mínimo 5KB)
+        if (!replayArray || replayArray.length < 5000) {
+            console.log("⚠️ Grabación demasiado corta o vacía, se omite la subida.");
+            return;
+        }
 
-        // Convertimos el Array que viene de Puppeteer a un Buffer de Node.js
         const replayBuffer = Buffer.from(replayArray);
         const footballerName = this.state.currentRound?.footballer || "Desconocido";
 
         const formData = new FormData();
         formData.append("replay[name]", `Impostor: ${footballerName.toUpperCase()}`);
         formData.append("replay[private]", "false");
-        // Importante: Usamos Blob para que el fetch lo trate como archivo binario
-        formData.append("replay[fileContent]", new Blob([replayBuffer]), "replay.hbr");
+        
+        // REEMPLAZO DEL BLOB: Usamos el buffer directo con opciones de archivo
+        formData.append("replay[fileContent]", replayBuffer, {
+            filename: 'replay.hbr',
+            contentType: 'application/octet-stream',
+        });
 
         const response = await fetch("https://replay.thehax.pl/api/upload", {
             method: "POST",
             headers: {
                 "API-Tenant": this.REPLAY_CONFIG.TENANT_KEY,
                 "API-Key": this.REPLAY_CONFIG.API_KEY,
+                // Esto es importante cuando usas la librería form-data en Node
+                ...formData.getHeaders()
             },
             body: formData,
         });
@@ -777,9 +786,11 @@ async handleReplayUpload() {
         if (res.success) {
             this.adapter.sendAnnouncement(`✅ REPLAY SUBIDO: ${res.url}`, null, { color: 0x00FFCC, fontWeight: 'bold' });
             this.sendDiscordReplay(res.url, footballerName);
+        } else {
+            console.error("❌ La API rechazó el archivo:", res.message);
         }
     } catch (e) {
-        console.error("❌ Error subiendo replay:", e);
+        console.error("❌ Error crítico en handleReplayUpload:", e);
     }
 }
 
