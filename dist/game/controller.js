@@ -4,7 +4,6 @@
       return (mod && mod.__esModule) ? mod : { default: mod };
     };
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.GameController = void 0;
     // Solo si usas Node < 18
     const fetch = require('node-fetch');
     const FormData = require('form-data');
