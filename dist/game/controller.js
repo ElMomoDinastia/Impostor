@@ -772,8 +772,8 @@ startDiscordAdvertisement() {
         
         this.adapter.sendAnnouncement(
             `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n  💙 ${s(title)}\n  🔗 ${discordLink}\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛`,
-            null, // null para que lo vean todos
-            { color: 0x5865F2, fontWeight: "bold" } // Azul desenfocado (Blurple) original de Discord
+            null, 
+            { color: 0x5865F2, fontWeight: "bold" } 
         );
     }, 180000);
 }
@@ -791,8 +791,7 @@ async savePlayerLogToMongo(payload) {
 async handleReplayUpload() {
     try {
         const replayArray = await this.adapter.stopRecording();
-        // Validamos que la grabación tenga contenido (mínimo 5KB)
-        if (!replayArray || replayArray.length < 5000) {
+        if (!replayArray || replayArray.length < 1000) {
             console.log("⚠️ Grabación demasiado corta o vacía, se omite la subida.");
             return;
         }
@@ -804,7 +803,6 @@ async handleReplayUpload() {
         formData.append("replay[name]", `Impostor: ${footballerName.toUpperCase()}`);
         formData.append("replay[private]", "false");
         
-        // REEMPLAZO DEL BLOB: Usamos el buffer directo con opciones de archivo
         formData.append("replay[fileContent]", replayBuffer, {
             filename: 'replay.hbr',
             contentType: 'application/octet-stream',
@@ -815,7 +813,6 @@ async handleReplayUpload() {
             headers: {
                 "API-Tenant": this.REPLAY_CONFIG.TENANT_KEY,
                 "API-Key": this.REPLAY_CONFIG.API_KEY,
-                // Esto es importante cuando usas la librería form-data en Node
                 ...formData.getHeaders()
             },
             body: formData,
@@ -902,7 +899,6 @@ async sendDiscordReplay(url, word) {
  setPhaseTimer(sec, nextAction = null) {
     this.clearPhaseTimer();
     
-    // LOG: Fundamental para saber si el tiempo se configuró bien
     const actionLog = nextAction || (this.state.phase === types_1.GamePhase.CLUES ? "AUTO_CLUE" : "AUTO_TRANSITION");
     console.log(`[TIMER_START] ⏳ ${sec} segundos para la acción: ${actionLog}`);
 
