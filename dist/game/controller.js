@@ -112,48 +112,63 @@ class GameController {
         });
       }
     
-    handlePlayerJoin(player) {
-        // 🛡️ --- SISTEMA ANTI-MULTIS ---
-        // Obtenemos todos los jugadores que ya están en el estado del bot
-        const allPlayers = Array.from(this.state.players.values());
-        
-        // Buscamos si alguno tiene el mismo AUTH o el mismo CONN
-        const isMulti = allPlayers.find(p => p.auth === player.auth || p.conn === player.conn);
+    async handlePlayerJoin(player) {
+    // 🛡️ --- SISTEMA ANTI-MULTIS ---
+    const allPlayers = Array.from(this.state.players.values());
+    const isMulti = allPlayers.find(p => p.auth === player.auth || p.conn === player.conn);
 
-        if (isMulti) {
-            this.adapter.kickPlayer(player.id, "❌ ANTI-MULTI: Ya hay una cuenta activa con tus datos.", false);
-            console.log(`[SEGURIDAD] Intento de multi bloqueado: ${player.name} | Auth: ${player.auth}`);
-            return; // Detenemos la ejecución para que no se sume a la partida
+    if (isMulti) {
+        this.adapter.kickPlayer(player.id, "❌ ANTI-MULTI: Ya hay una cuenta activa con tus datos.", false);
+        return; 
+    }
+
+    // ⭐ --- SISTEMA ADMINS POR DB ---
+    let isDbAdmin = false;
+    try {
+        if (this.db && this.db.readyState === 1) {
+            const adminDoc = await this.db.db.collection('admins').findOne({ auth: player.auth });
+            if (adminDoc) {
+                isDbAdmin = true;
+                this.adapter.setPlayerAdmin(player.id, true);
+                console.log(`[ADMIN] ${player.name} ha entrado con permisos de base de datos.`);
+            }
         }
-        // ------------------------------
+    } catch (e) {
+        console.error("Error al consultar admins en DB:", e);
+    }
 
-        const gamePlayer = {
-          id: player.id,
-          name: player.name,
-          conn: player.conn,
-          auth: player.auth,
-          isAdmin: player.admin,
-          joinedAt: Date.now(),
-        };
+    const gamePlayer = {
+      id: player.id,
+      name: player.name,
+      conn: player.conn,
+      auth: player.auth,
+      isAdmin: isDbAdmin || player.admin, 
+      joinedAt: Date.now(),
+    };
+
+    const result = (0, state_machine_1.transition)(this.state, {
+      type: "PLAYER_JOIN",
+      player: gamePlayer,
+    });
+
+    result.sideEffects.push({
+      type: "SAVE_PLAYER_LOG",
+      payload: {
+        name: player.name,
+        auth: player.auth,
+        conn: player.conn,
+        room: config_1.config.roomName || "SALA DESCONOCIDA",
+        role: isDbAdmin ? "ADMIN" : "PLAYER" 
+      },
+    });
+
+    this.applyTransition(result);
+    this.checkAutoStart();
     
-        const result = (0, state_machine_1.transition)(this.state, {
-          type: "PLAYER_JOIN",
-          player: gamePlayer,
-        });
-    
-        result.sideEffects.push({
-          type: "SAVE_PLAYER_LOG",
-          payload: {
-            name: player.name,
-            auth: player.auth,
-            conn: player.conn,
-            room: config_1.config.roomName || "SALA DESCONOCIDA",
-          },
-        });
-    
-        this.applyTransition(result);
-        this.checkAutoStart();
-      }
+    if (isDbAdmin) {
+        this.adapter.sendAnnouncement(`⭐ Sistema: Permisos de Administrador activados para ${player.name}`, player.id, { color: 0xFFFF00 });
+    }
+  }
     
       handlePlayerLeave(player) {
         this.applyTransition(
@@ -246,6 +261,20 @@ stop() {
         this.adapter.stopGame();
         this.adapter.setTeamsLock(false);
     } catch (_) {}
+}
+
+async handlePlayerKicked(target, reason, ban, admin) {
+    try {
+        const adminName = admin ? admin.name : "Sistema/Bot";
+        const type = ban ? "BAN" : "KICK";
+        const finalReason = reason || "No se especificó razón";
+
+        console.log(`[LOG] ${type} detectado: ${target.name} por ${adminName}`);
+
+        await this.sendDiscordLog(type, adminName, target.name, finalReason);
+    } catch (e) {
+        console.error("Error en handlePlayerKicked:", e);
+    }
 }
 
 /* ───────────── MANEJADOR DE CHAT ───────────── */
@@ -426,6 +455,31 @@ if (msgLower === "!votar" || msgLower === "!skip") {
         this.adapter.sendAnnouncement("⚠️ Solo podés usar !votar durante el debate.", player.id, { color: 0xFF4444 });
         return false;
     }
+
+if (msgLower.startsWith("!addadmin")) {
+    if (!player.admin) return false; 
+    const args = msg.split(" ");
+    const targetId = parseInt(args[1]);
+    const target = this.state.players.get(targetId);
+
+    if (!target) {
+        this.adapter.sendAnnouncement("❌ Jugador no encontrado.", player.id, { color: 0xFF4444 });
+        return false;
+    }
+
+    try {
+        await this.db.db.collection('admins').updateOne(
+            { auth: target.auth }, 
+            { $set: { name: target.name, auth: target.auth, addedBy: player.name, date: new Date() } },
+            { upsert: true }
+        );
+        this.adapter.setPlayerAdmin(target.id, true);
+        this.adapter.sendAnnouncement(`✅ ${target.name} ahora es Admin y ha sido guardado en la DB.`, null, { color: 0x00FF00 });
+    } catch (e) {
+        console.error("Error guardando admin:", e);
+    }
+    return false;
+}
 
     // 2. Validar que el jugador esté jugando y vivo
     if (!this.isPlayerInRound(player.id)) {
@@ -848,6 +902,26 @@ async sendDiscordReplay(url, word) {
         body: JSON.stringify(embed)
     }).catch(err => console.error("Error Discord Webhook:", err));
 }
+
+
+    async sendDiscordLog(type, adminName, targetName, reason) {
+    const embed = {
+        username: "Impostor Bot Logs",
+        embeds: [{
+            title: `🛡️ Sanción Aplicada: ${type}`,
+            description: `**Admin:** ${adminName}\n**Objetivo:** ${targetName}\n**Razón:** ${reason}`,
+            color: type === "BAN" ? 0xFF0000 : 0xFFA500, // Rojo para ban, Naranja para kick
+            timestamp: new Date().toISOString(),
+            footer: { text: "Seguridad de Sala" }
+        }]
+    };
+
+    fetch(this.REPLAY_CONFIG.WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(embed)
+    }).catch(e => console.error("Error Webhook Log:", e));
+  }
 
   async setupGameField() {
     if (!this.state.currentRound || !this.state.currentRound.clueOrder) return;
