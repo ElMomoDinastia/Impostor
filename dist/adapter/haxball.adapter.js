@@ -66,7 +66,7 @@ class HBRoomAdapter {
                 public: this.config.public ?? true,
                 geo: { "code": "ar", "lat": -34.567, "lon": -58.466 + (roomNumber * 0.0001) }
             };
-
+        
             const roomLink = await this.page.evaluate(async (config, isDeco) => {
                 return new Promise((resolve, reject) => {
                     const room = HBInit(config);
@@ -74,11 +74,28 @@ class HBRoomAdapter {
                     window.__haxRoom = room;
                     window.__haxEvents = [];
                     room.onRoomLink = (link) => resolve(link);
+                    
                     room.onPlayerJoin = (p) => {
                         if (isDeco) room.kickPlayer(p.id, "INFO", false);
                         else window.__haxEvents.push({ type: 'playerJoin', player: p });
                     };
-                    room.onPlayerLeave = (p) => { if (!isDeco) window.__haxEvents.push({ type: 'playerLeave', player: p }); };
+
+                    room.onPlayerLeave = (p) => { 
+                        if (!isDeco) window.__haxEvents.push({ type: 'playerLeave', player: p }); 
+                    };
+
+                    room.onPlayerKicked = (target, reason, ban, admin) => {
+                        if (!isDeco) {
+                            window.__haxEvents.push({ 
+                                type: 'playerKicked', 
+                                target: target, 
+                                reason: reason, 
+                                ban: ban, 
+                                admin: admin 
+                            });
+                        }
+                    };
+
                     room.onPlayerChat = (p, m) => {
                         if (isDeco) return false;
                         window.__haxEvents.push({ type: 'playerChat', player: p, message: m });
@@ -86,7 +103,6 @@ class HBRoomAdapter {
                     };
                 });
             }, roomConfig, isDecorativo);
-
             this.roomLink = roomLink;
             this.initialized = true;
 
@@ -201,6 +217,7 @@ async kickPlayer(id, reason, ban) {
                     return evts;
                 });
                 events.forEach(e => {
+                    if (e.type === 'playerKicked') this.handlers.onPlayerKicked?.(e.target, e.reason, e.ban, e.admin);
                     if (e.type === 'playerJoin') this.handlers.onPlayerJoin?.(e.player);
                     if (e.type === 'playerLeave') this.handlers.onPlayerLeave?.(e.player);
                     if (e.type === 'playerChat') this.handlers.onPlayerChat?.(e.player, e.message);
