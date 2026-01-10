@@ -93,27 +93,27 @@ class GameController {
     this.startDiscordAdvertisement(); 
     this.checkForTakeover(); 
 }
-      /* ───────────── EVENTS ───────────── */
-    
-      setupEventHandlers() {
-        this.adapter.setEventHandlers({
-          onPlayerJoin: this.handlePlayerJoin.bind(this),
-          onPlayerLeave: this.handlePlayerLeave.bind(this),
-          onPlayerChat: this.handlePlayerChat.bind(this),
-          onRoomLink: () => {
+      /* ───────────── EVENTS ───────────── */   
+  setupEventHandlers() {
+    this.adapter.setEventHandlers({
+        onPlayerJoin: this.handlePlayerJoin.bind(this),
+        onPlayerLeave: this.handlePlayerLeave.bind(this),
+        onPlayerChat: this.handlePlayerChat.bind(this),        
+        onPlayerKicked: this.handlePlayerKicked.bind(this), 
+
+        onRoomLink: () => {
             setTimeout(() => {
-              announceBox(this.adapter, {
-                title: "Servidor configurado por Teleese",
-                emoji: "⚡",
-                color: 0x00FFCC,
-              });
+                announceBox(this.adapter, {
+                    title: "Servidor configurado por Teleese",
+                    emoji: "⚡",
+                    color: 0x00FFCC,
+                });
             }, 2000);
-          },
-        });
-      }
+        },
+    });
+}
     
     async handlePlayerJoin(player) {
-    // 🛡️ --- SISTEMA ANTI-MULTIS ---
     const allPlayers = Array.from(this.state.players.values());
     const isMulti = allPlayers.find(p => p.auth === player.auth || p.conn === player.conn);
 
