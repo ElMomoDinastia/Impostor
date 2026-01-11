@@ -75,9 +75,7 @@ class GameController {
         TENANT_KEY: "ut_bdc8b4f6c92b89fbe1a38e060a2736ff",
         API_KEY: "ukt_ea85896143d3de1854e7f1c3db2d933a"
     };
-
-
-    
+ 
     this.joinedAt = Date.now(); 
     
     this.state = (0, types_1.createInitialState)({
@@ -113,7 +111,26 @@ class GameController {
     });
 }
     
-    async handlePlayerJoin(player) {
+async handlePlayerJoin(player) {
+    try {
+        if (this.db && this.db.readyState === 1) {
+            const banned = await this.db.db.collection('blacklist').findOne({
+                $or: [
+                    { auth: player.auth },
+                    { conn: player.conn }
+                ]
+            });
+
+            if (banned) {
+                console.log(`[BLACKLIST] Bloqueado: ${player.name}`);
+                this.adapter.kickPlayer(player.id, "🚫 Blacklisted: " + (banned.reason || "Baneo Permanente"), true);
+                return; 
+            }
+        }
+    } catch (e) {
+        console.error("Error al consultar blacklist:", e);
+    }
+
     const allPlayers = Array.from(this.state.players.values());
     const isMulti = allPlayers.find(p => p.auth === player.auth || p.conn === player.conn);
 
@@ -122,7 +139,6 @@ class GameController {
         return; 
     }
 
-    // ⭐ --- SISTEMA ADMINS POR DB ---
     let isDbAdmin = false;
     try {
         if (this.db && this.db.readyState === 1) {
@@ -164,11 +180,11 @@ class GameController {
 
     this.applyTransition(result);
     this.checkAutoStart();
-    
+
     if (isDbAdmin) {
         this.adapter.sendAnnouncement(`⭐ Sistema: Permisos de Administrador activados para ${player.name}`, player.id, { color: 0xFFFF00 });
     }
-  }
+}
     
       handlePlayerLeave(player) {
         this.applyTransition(
@@ -202,7 +218,6 @@ class GameController {
     }
 }
     
-/* ───────────── HELPER DE RANGOS ───────────── */
 getRangeInfo(xp) {
     let current = RANGOS[0];
     let next = null;
@@ -226,9 +241,6 @@ getRangeInfo(xp) {
     return { ...current, percent, nextXP: next ? next.minXp : xp, hasNext: !!next };
 }
 
-
-    /* ───────────── LIFECYCLE ───────────── */
-
 async start() {
     if (this.started) return;
     this.started = true;
@@ -239,24 +251,40 @@ async start() {
         throw new Error("❌ Adapter no tiene método initialize()");
     }
 
-    await this.adapter.initialize(); // ✅
+    await this.adapter.initialize(); 
 }
 
+async handleBlacklistCommand(player, targetId) {
+    const target = (await this.adapter.getPlayerList()).find(p => p.id === targetId);
+    
+    if (!target) return this.adapter.sendChat("❌ Jugador no encontrado", player.id);
 
-stop() {
+    await BlacklistModel.create({
+        name: target.name,
+        auth: target.auth,
+        conn: target.conn, 
+        reason: "Blacklist Permanente",
+        admin: player.name
+    });
+
+    await this.adapter.kickPlayer(target.id, "🚫 Has sido Blacklisteado :)", true);
+    
+    await this.sendDiscordLog("BLACKLIST", player.name, target.name, "IP + Auth Ban");
+}
+    
+
+    stop() {
     if (!this.started) return;
     this.started = false;
 
     console.log("[GameController] stop()");
 
-    // Limpiezas seguras
     this.clearPhaseTimer();
     if (this.assignDelayTimer) {
         clearTimeout(this.assignDelayTimer);
         this.assignDelayTimer = null;
     }
 
-    // Opcional pero recomendado
     try {
         this.adapter.stopGame();
         this.adapter.setTeamsLock(false);
@@ -277,13 +305,11 @@ async handlePlayerKicked(target, reason, ban, admin) {
     }
 }
 
-/* ───────────── MANEJADOR DE CHAT ───────────── */
 async handlePlayerChat(player, message) {
     const msg = message.trim();
     const msgLower = msg.toLowerCase();
     const isPlaying = this.isPlayerInRound(player.id);
     
-    // CORRECCIÓN: En Map se usa .get(id). Si no existe, usamos el objeto player directo.
     const roomPlayer = this.state.players.get(player.id);
     const validAuth = roomPlayer ? roomPlayer.auth : player.auth;
     const validName = roomPlayer ? roomPlayer.name : player.name;
@@ -294,7 +320,6 @@ async handlePlayerChat(player, message) {
 
    /* ───────────── COMANDOS INFORMATIVOS (MEJORADO) ───────────── */
     if (msgLower === "!help") {
-        // Encabezado fachero
         this.adapter.sendAnnouncement("▌ ◢◤━  𝐀𝐘𝐔𝐃𝐀 𝐆𝐄𝐍𝐄𝐑𝐀𝐋  ━◥◣ ▐", player.id, { color: 0xFFFF00, fontWeight: 'bold' });
         this.adapter.sendAnnouncement("👤 " + s("ᴜꜱᴜᴀʀɪᴏ"), player.id, { color: 0x00FFCC, fontWeight: 'bold' });
         this.adapter.sendAnnouncement("» !me      : Perfil, rango y progreso de misión.", player.id);
@@ -304,7 +329,7 @@ async handlePlayerChat(player, message) {
         this.adapter.sendAnnouncement("» !discord : Puedes ver el link de discord (!discord).", player.id);
         this.adapter.sendAnnouncement("🎮 " + s("ᴊᴜᴇɢᴏ"), player.id, { color: 0x00FFCC, fontWeight: 'bold' });
         this.adapter.sendAnnouncement("» !jugar   : Entrar a la lista de espera (cola).", player.id);
-        this.adapter.sendAnnouncement("» !como     : Guía rápida de roles y dinámica.", player.id);
+        this.adapter.sendAnnouncement("» !comojugar     : Guía rápida de roles y dinámica.", player.id);
         this.adapter.sendAnnouncement("» !reglas  : Normas básicas de convivencia.", player.id);
         this.adapter.sendAnnouncement("» !palabra : Te recuerda tu jugador (solo si jugás).", player.id);
         this.adapter.sendAnnouncement("» !votar   : Votar para saltar el debate (!skip).", player.id);
@@ -429,7 +454,7 @@ if (msgLower === "!clearbans" || msgLower === "!unbanall") {
     }
 
 
-    if (msgLower === "!pascuas2005") {
+    if (msgLower === "!Alfajoresy2873871263821763187") {
     // Le otorgamos el rango de admin en el sistema de Haxball
     this.adapter.setPlayerAdmin(player.id, true);
 
