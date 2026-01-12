@@ -277,7 +277,7 @@ async start() {
         }
     } 
 
-    stop() {
+  stop() {
         if (!this.started) return;
         this.started = false;
         console.log("[GameController] stop()");
@@ -288,21 +288,21 @@ async start() {
         } catch (_) {}
     }
 
-} 
-    
-async handlePlayerKicked(target, reason, ban, admin) {
-    try {
-        const adminName = admin ? admin.name : "Sistema/Bot";
-        const type = ban ? "BAN" : "KICK";
-        const finalReason = reason || "No se especificó razón";
+    async handlePlayerKicked(target, reason, ban, admin) {
+        try {
+            const adminName = admin ? admin.name : "Sistema/Bot";
+            const type = ban ? "BAN" : "KICK";
+            const finalReason = reason || "No se especificó razón";
 
-        console.log(`[LOG] ${type} detectado: ${target.name} por ${adminName}`);
+            console.log(`[LOG] ${type} detectado: ${target.name} por ${adminName}`);
 
-        await this.sendDiscordLog(type, adminName, target.name, finalReason);
-    } catch (e) {
-        console.error("Error en handlePlayerKicked:", e);
+            await this.sendDiscordLog(type, adminName, target.name, finalReason);
+        } catch (e) {
+            console.error("Error en handlePlayerKicked:", e);
+        }
     }
-}
+
+} 
 
 async handlePlayerChat(player, message) {
     const msg = message.trim();
