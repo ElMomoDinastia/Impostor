@@ -48,14 +48,12 @@ class HBRoomAdapter {
 
             let finalName = "";
             if (isHeader) {
-                finalName = "▌ ◢◤━ 𝐓𝐄𝐋𝐄𝐄𝐒𝐄 𝐏𝐑𝐎𝐉𝐄𝐂𝐓 ━◥◣ ▐";
+            finalName = "◥◣  ▓▒░  𝐏𝐑𝐎𝐉𝐄𝐂𝐓𝐎 𝐓𝐄𝐋𝐄𝐄𝐒𝐄 ░▒▓  ◢◤";
             } else if (isFooter) {
-                finalName = "▌ ◥◣━ dsc.gg/impostores ━◢◤ ▐";
+            finalName = "◢◤  ▓▒░  dsc.gg/impostores  ░▒▓  ◥◣";
             } else {
-                const fancyNums = ["𝟬𝟬", "𝟬𝟭", "𝟬𝟮", "𝟬𝟯", "𝟬𝟰", "𝟬𝟱", "𝟬𝟲", "𝟬𝟳"];
-                const n = fancyNums[roomNumber] ?? roomNumber.toString().padStart(2, "0");
-                // ESTÉTICA: Usamos ◢◤ para que enganche con el Header de arriba
-                finalName = `▌ ◢◤━   𝐈𝐌𝐏𝐎𝐒𝐓𝐎𝐑 ${n}   ━◥◣ ▐`;
+            const n = fancyNums[roomNumber] ?? (roomNumber + 1).toString().padStart(2, "0");    
+            finalName = `▒░ 🔴 » 𝐈𝐌𝐏𝐎𝐒𝐓𝐎𝐑 ${n} « 🔴 ░▒ ▄`;
             }
 
             const roomConfig = {
