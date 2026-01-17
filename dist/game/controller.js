@@ -22,7 +22,10 @@
     { name: "TEISTA", tag: "412", minXp: 3000, emoji: "🛰️", color: 0xFFFF00 },
     { name: "AGUSNETA", tag: "AGU", minXp: 6000, emoji: "🏎️", color: 0x00FFFF },
     { name: "SABIO DE RED", tag: "SDR", minXp: 10000, emoji: "🕵️", color: 0xFF00FF },
-    { name: "DAVO", tag: "DAV", minXp: 20000, emoji: "📑", color: 0xFFD700 }
+    { name: "DAVO", tag: "DAV", minXp: 20000, emoji: "📑", color: 0xFFD700 },
+    { name: "MOMISTA", tag: "MOM", minXp: 25000, emoji: "🤡", color: 0xFF69B4 },
+    { name: "MESSIAS", tag: "MES", minXp: 35000, emoji: "🐐", color: 0x00A6FF },
+    { name: "DAVISTA SUPREMO", tag: "SUP", minXp: 45000, emoji: "👑", color: 0xFF0000 }
     ];
         
     /* ───────────── CONSTANTES ───────────── */
