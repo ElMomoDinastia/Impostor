@@ -52,15 +52,15 @@ const fancyNums = ["𝟬𝟬", "𝟬𝟭", "𝟬𝟮", "𝟬𝟯", "𝟬𝟰", "
 // Lógica para 8 tokens (0 al 7)
 if (roomNumber === 0) { 
     // TOKEN 0: El Header (Más corto para que no se corte el rayito)
-    finalName = "⚡▒ 𝐓𝐄𝐋𝐄𝐄𝐒𝐄 𝐏𝐑𝐎𝐉𝐄𝐂𝐓 ▒⚡";
+    finalName = "🕵️🔴───── IMPOSTORES HAXBALL ─────🔴🕵️ ";
 } else if (roomNumber === 7) { 
     // TOKEN 7: El Footer (El último de tus 8 tokens)
-    finalName = "🔗▒ dsc.gg/impostores ▒";
+    finalName = "🕵️🔴───── IMPOSTORES HAXBALL ─────🔴🕵️ ";
 } else {
     // TOKENS 1 al 6: Las 6 salas de juego
     // Usamos roomNumber para que la sala del token 1 diga "01", la del 2 "02", etc.
     const n = fancyNums[roomNumber];    
-    finalName = `🔴▒ 𝐈𝐌𝐏𝐎𝐒𝐓𝐎𝐑 ${n} ▒🔴`;
+    finalName = `🕵️🔴 Impostor #${n} | ADIVINÁ AL IMPOSTOR`;
 }
 
             const roomConfig = {
