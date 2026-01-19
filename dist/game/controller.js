@@ -785,58 +785,42 @@ async checkForTakeover() {
     }, 20000);
 }
     
-      /* ───────────── STATE ───────────── */
     
-   applyTransition(result) {
-        const prevPhase = this.state.phase; // Guardamos la fase anterior
-        this.state = result.state;
+applyTransition(result) {
+    const prevPhase = this.state.phase;
+    this.state = result.state;
 
-        // Si la fase cambió, limpiamos los votos de skip
-        if (prevPhase !== this.state.phase) {
-            this.skipVotes.clear();
-        }
-
-        // Lógica de grabación de Replays
-        if (prevPhase === types_1.GamePhase.WAITING && this.state.phase === types_1.GamePhase.ASSIGN) {
-            this.adapter.startRecording();
-            this.gameInProgress = true;
-            console.log("🎥 [REPLAY] Iniciando grabación...");
-        }
-
-        result.sideEffects.forEach((effect) => this.handleSideEffect(effect));
-    }
-
-    
-    if (prev === types_1.GamePhase.WAITING && this.state.phase === types_1.GamePhase.ASSIGN) {
-        this.adapter.startRecording();
-        this.gameInProgress = true;
-        console.log("🎥 [REPLAY] Iniciando grabación...");
-    }
-
-    if (this.gameInProgress && (this.state.phase === types_1.GamePhase.REVEAL || (prev !== types_1.GamePhase.WAITING && this.state.phase === types_1.GamePhase.WAITING))) {
-        this.gameInProgress = false;
-        console.log("🎬 [REPLAY] Partida terminada. Procesando video...");
-        setTimeout(() => this.handleReplayUpload(), 2000);
-    }
-    // ---------------------------
-
-    if (prev !== this.state.phase) {
+    if (prevPhase !== this.state.phase) {
         this.skipVotes.clear();
     }
-    
-    if (prev === types_1.GamePhase.VOTING && this.state.phase === types_1.GamePhase.CLUES) {
-        announceBox(this.adapter, { title: "preparando ronda", emoji: "⌛", color: 0xCCCCCC });
-        setTimeout(() => { this.executeSideEffects(result.sideEffects); }, 2000);
-        return;
+
+    if (prevPhase === types_1.GamePhase.WAITING &&
+        this.state.phase === types_1.GamePhase.ASSIGN) {
+        this.adapter.startRecording();
+        this.gameInProgress = true;
     }
 
-    this.executeSideEffects(result.sideEffects);
+    if (
+        this.gameInProgress &&
+        (
+            this.state.phase === types_1.GamePhase.REVEAL ||
+            (prevPhase !== types_1.GamePhase.WAITING &&
+             this.state.phase === types_1.GamePhase.WAITING)
+        )
+    ) {
+        this.gameInProgress = false;
+        setTimeout(() => this.handleReplayUpload(), 2000);
+    }
+
+    result.sideEffects.forEach(e => this.executeSideEffects([e]));
 
     if (this.state.phase === types_1.GamePhase.ASSIGN && !this.assignDelayTimer) {
         this.setupGameField();
         this.assignDelayTimer = setTimeout(() => {
             this.assignDelayTimer = null;
-            this.applyTransition((0, state_machine_1.transitionToClues)(this.state));
+            this.applyTransition(
+                (0, state_machine_1.transitionToClues)(this.state)
+            );
         }, 3000);
     }
 }
