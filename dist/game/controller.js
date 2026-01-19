@@ -313,7 +313,6 @@ async handlePlayerChat(player, message) {
     const isPlaying = this.isPlayerInRound(player.id);
     const roomPlayer = this.state.players.get(player.id);
     const isDbAdmin = roomPlayer?.isAdmin || player.admin;    
-    const roomPlayer = this.state.players.get(player.id);
     const validAuth = roomPlayer ? roomPlayer.auth : player.auth;
     const validName = roomPlayer ? roomPlayer.name : player.name;
 
