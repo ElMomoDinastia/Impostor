@@ -93,6 +93,7 @@ class GameController {
     this.setupEventHandlers();
     this.startDiscordAdvertisement(); 
     this.checkForTakeover(); 
+    this.adminCallCooldown = new Set();
 }
       /* ───────────── EVENTS ───────────── */   
   setupEventHandlers() {
@@ -326,7 +327,7 @@ async handlePlayerChat(player, message) {
         this.adapter.sendAnnouncement("» !discord : Puedes ver el link de discord (!discord).", player.id);
         this.adapter.sendAnnouncement("🎮 " + s("ᴊᴜᴇɢᴏ"), player.id, { color: 0x00FFCC, fontWeight: 'bold' });
         this.adapter.sendAnnouncement("» !jugar   : Entrar a la lista de espera (cola).", player.id);
-        this.adapter.sendAnnouncement("» !comojugar     : Guía rápida de roles y dinámica.", player.id);
+        this.adapter.sendAnnouncement("» !nv | !bb     : Salir de la sala rapidamente", player.id);
         this.adapter.sendAnnouncement("» !reglas  : Normas básicas de convivencia.", player.id);
         this.adapter.sendAnnouncement("» !palabra : Te recuerda tu jugador (solo si jugás).", player.id);
         this.adapter.sendAnnouncement("» !votar   : Votar para saltar el debate (!skip).", player.id);
@@ -334,6 +335,54 @@ async handlePlayerChat(player, message) {
         return false;
     }
 
+    if (msgLower === "!nv" || msgLower === "!bb") {
+        const despedidas = ["¡Nos vemos!", "¡Hasta la próxima!", "¡Un gusto!", "¡Chau chau!"];
+        const frase = despedidas[Math.floor(Math.random() * despedidas.length)];
+        
+        this.adapter.sendAnnouncement(`👋 ${player.name} dice: ${frase}`, null, { color: 0xFFCC00 });
+        
+        setTimeout(() => {
+            this.adapter.kickPlayer(player.id, "¡Gracias por jugar! Volvé pronto.", false);
+        }, 1000);
+        return false;
+    }
+
+
+    if (msgLower.startsWith("!llamaradmin")) {
+        if (this.adminCallCooldown.has(player.auth)) {
+            this.adapter.sendAnnouncement("⏳ Ya enviaste un aviso. Esperá un poco para llamar de nuevo.", player.id, { color: 0xFF4444 });
+            return false;
+        }
+
+        const motivo = msg.split(" ").slice(1).join(" ") || "Sin motivo especificado";
+        const webhookUrl = "https://discord.com/api/webhooks/1462645714663379070/KmI7Z6l4yOkfaAbe0Hh4q6dFQG0DLoUfYJuXNpCcTFiUR_Cl66kVNT4rejwX7-WWG_rV";
+
+        this.adapter.sendAnnouncement("🚀 " + s("Llamado enviado al staff. Por favor, aguardá."), player.id, { color: 0x00FF00 });
+
+        fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: "🔔 **¡ALERTA EN EL SERVER!** @everyone",
+                embeds: [{
+                    title: "🆘 Solicitud de Asistencia",
+                    color: 0xFFA500,
+                    fields: [
+                        { name: "👤 Jugador", value: `**${player.name}**`, inline: true },
+                        { name: "🆔 Auth", value: `\`${player.auth}\``, inline: true },
+                        { name: "📝 Motivo", value: motivo }
+                    ],
+                    footer: { text: "Sistema de Moderación • Teleese" },
+                    timestamp: new Date()
+                }]
+            })
+        }).catch(err => console.error("Error Webhook:", err));
+
+        this.adminCallCooldown.add(player.auth);
+        setTimeout(() => this.adminCallCooldown.delete(player.auth), 120000); 
+
+        return false;
+    }
 
     if (msgLower === "!discord") {
     const title = "ᴜɴɪᴛᴇ ᴀʟ ᴅɪꜱᴄᴏʀᴅ";
