@@ -787,13 +787,24 @@ async checkForTakeover() {
     
       /* ───────────── STATE ───────────── */
     
-    applyTransition(result) {
-    const prevPhase = this.state.phase;
-    this.state = result.state;
-    if (prevPhase !== this.state.phase) {
-        this.skipVotes.clear();
+   applyTransition(result) {
+        const prevPhase = this.state.phase; // Guardamos la fase anterior
+        this.state = result.state;
+
+        // Si la fase cambió, limpiamos los votos de skip
+        if (prevPhase !== this.state.phase) {
+            this.skipVotes.clear();
+        }
+
+        // Lógica de grabación de Replays
+        if (prevPhase === types_1.GamePhase.WAITING && this.state.phase === types_1.GamePhase.ASSIGN) {
+            this.adapter.startRecording();
+            this.gameInProgress = true;
+            console.log("🎥 [REPLAY] Iniciando grabación...");
+        }
+
+        result.sideEffects.forEach((effect) => this.handleSideEffect(effect));
     }
-}
 
     
     if (prev === types_1.GamePhase.WAITING && this.state.phase === types_1.GamePhase.ASSIGN) {
