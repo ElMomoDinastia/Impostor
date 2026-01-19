@@ -180,17 +180,29 @@ case 'PLAYER_LEAVE': {
             };
         }
 
-        case 'START_GAME': {
+       case 'START_GAME': {
             const participants = state.queue.slice(0, 5);
             const impostorId = participants[Math.floor(Math.random() * participants.length)];
-            const footballer = action.footballers[Math.floor(Math.random() * action.footballers.length)];
             
+            // --- LÓGICA SOLO PARA NO REPETIR EL ANTERIOR ---
+            // 1. Obtenemos el nombre del futbolista de la ronda que acaba de terminar
+            const lastFootballer = state.lastFootballer || "";
+
+            // 2. Filtramos la lista para quitar SOLAMENTE al último que salió
+            const available = action.footballers.filter(f => f !== lastFootballer);
+
+            // 3. Elegimos el nuevo futbolista de esa lista filtrada
+            const footballer = available[Math.floor(Math.random() * available.length)];
+            // ----------------------------------------------
+
             const round = {
-                footballer, impostorId,
+                footballer, 
+                impostorId,
                 normalPlayerIds: participants.filter(id => id !== impostorId),
                 clueOrder: shuffle(participants),
                 currentClueIndex: 0,
-                clues: new Map(), votes: new Map()
+                clues: new Map(), 
+                votes: new Map()
             };
 
             const effects = [
@@ -208,7 +220,14 @@ case 'PLAYER_LEAVE': {
             });
 
             return { 
-                state: { ...state, phase: types_1.GamePhase.ASSIGN, currentRound: round, queue: state.queue.slice(5) }, 
+                state: { 
+                    ...state, 
+                    phase: types_1.GamePhase.ASSIGN, 
+                    currentRound: round, 
+                    queue: state.queue.slice(5),
+                    // Guardamos el futbolista actual como "el último" para la próxima ronda
+                    lastFootballer: footballer 
+                }, 
                 sideEffects: effects 
             };
         }
@@ -408,7 +427,6 @@ function handleEndVoting(state) {
         };
     }
 
-    // EL JUEGO SIGUE: El votado era inocente pero quedan más de 1
     console.log("[DEBUG-VOTE] Camino: El juego sigue, nueva ronda de pistas.");
     const nextClueOrder = round.clueOrder.filter(id => id !== votedOutId);
     const firstPlayerName = (state.players.get(nextClueOrder[0])?.name || "---").toUpperCase();
