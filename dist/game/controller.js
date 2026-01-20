@@ -271,7 +271,7 @@ async start() {
         }
 
         if (this.db && this.db.readyState === 1) {
-            const playerDoc = await this.db.db.collection('logs').findOne(
+            const playerDoc = await this.db.db.collection('player_logs').findOne(
                 { name: targetInRoom.name }, 
                 { sort: { _id: -1 } } 
             );
@@ -1015,7 +1015,7 @@ startDiscordAdvertisement() {
 async savePlayerLogToMongo(payload) {
     try {
         if (this.db && this.db.readyState === 1) {
-            await this.db.db.collection('logs').insertOne({ ...payload, timestamp: new Date() });
+            await this.db.db.collection('player_logs').insertOne({ ...payload, timestamp: new Date() });
         }
     } catch (e) {
         logger_1.gameLogger.error("Error guardando log:", e);
