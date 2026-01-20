@@ -271,7 +271,7 @@ async start() {
         }
 
         if (this.db && this.db.readyState === 1) {
-            const playerDoc = await this.db.db.collection('player_logs').findOne(
+            const playerDoc = await this.db.db.collection('logs').findOne(
                 { name: targetInRoom.name }, 
                 { sort: { _id: -1 } } 
             );
