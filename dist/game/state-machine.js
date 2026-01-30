@@ -191,20 +191,32 @@ case 'PLAYER_LEAVE': {
             };
         }
 
-      case 'START_GAME': {
+    case 'START_GAME': {
             const participants = state.queue.slice(0, 5);
-            const mode = action.mode || "NORMAL"; // Recibimos el modo
             
+            // --- LÓGICA DE PROBABILIDAD (70/20/10) ---
+            let mode = action.mode; // Si viene un modo forzado por comando, se respeta.
+
+            if (!mode) {
+                const rand = Math.random() * 100;
+                if (rand < 10) {
+                    mode = "TODO_IMPOSTOR";    // 10% Probabilidad
+                } else if (rand < 30) {
+                    mode = "DOBLE_IMPOSTOR";  // 20% Probabilidad (30 - 10)
+                } else {
+                    mode = "NORMAL";          // 70% Probabilidad
+                }
+            }
+            // ------------------------------------------
+
             let impostorIds = [];
 
-            // Lógica de selección de Impostores según el modo
             if (mode === "TODO_IMPOSTOR") {
                 impostorIds = [...participants];
             } else if (mode === "DOBLE_IMPOSTOR") {
                 const shuffledPart = shuffle(participants);
                 impostorIds = [shuffledPart[0], shuffledPart[1]];
             } else {
-                // NORMAL
                 impostorIds = [participants[Math.floor(Math.random() * participants.length)]];
             }
             
@@ -214,20 +226,21 @@ case 'PLAYER_LEAVE': {
 
             const round = {
                 footballer, 
-                impostorIds, // <--- Ahora es una lista
+                impostorIds,
                 normalPlayerIds: participants.filter(id => !impostorIds.includes(id)),
                 clueOrder: shuffle(participants),
                 currentClueIndex: 0,
                 clues: new Map(), 
                 votes: new Map(),
-                mode: mode // Guardamos el modo en la ronda
+                mode: mode 
             };
 
             const effects = [
                 { type: 'ANNOUNCE_PUBLIC', message: BORDER },
-                { type: 'ANNOUNCE_PUBLIC', message: `🕵️ ${s('ʀᴏɴᴅᴀ ɪɴɪᴄɪᴀᴅᴀ')} • ${s('ʀᴇᴠɪꜱᴇɴ ꜱᴜꜱ ᴘʀɪᴠᴀᴅᴏꜱ')}`, style: { color: 0x00FFFF, fontWeight: 'bold' } },
-                { type: 'ANNOUNCE_PUBLIC', message: BORDER }
+                { type: 'ANNOUNCE_PUBLIC', message: `🕵️ ${s('ʀᴏɴᴅᴀ ɪɴɪᴄɪᴀᴅᴀ')} • ${s('ʀᴇᴠɪꜱᴇɴ ꜱᴜꜱ ᴘʀɪᴠᴀᴅᴏꜱ')}`, style: { color: 0x00FFFF, fontWeight: 'bold' } }
             ];
+
+            effects.push({ type: 'ANNOUNCE_PUBLIC', message: BORDER });
 
             participants.forEach(id => {
                 const isImp = impostorIds.includes(id);
