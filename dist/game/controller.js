@@ -348,9 +348,10 @@ async handlePlayerChat(player, message) {
         this.adapter.sendAnnouncement("» !comojugar      : Te explica como jugar si sos alto pete", player.id);
         this.adapter.sendAnnouncement("» !top     : Ranking global de los mejores (XP).", player.id);
         this.adapter.sendAnnouncement("» !rangos  : Lista de todas las jerarquías.", player.id);     
+        this.adapter.sendAnnouncement("» !llamaradmin (Motivo)  : Llamar a los administradores , usalo con precaucion", player.id);     
         this.adapter.sendAnnouncement("» !discord : Puedes ver el link de discord (!discord).", player.id);
         this.adapter.sendAnnouncement("🎮 " + s("ᴊᴜᴇɢᴏ"), player.id, { color: 0x00FFCC, fontWeight: 'bold' });
-        this.adapter.sendAnnouncement("» !jugar   : Entrar a la lista de espera (cola).", player.id);
+        this.adapter.sendAnnouncement("» jugar   : Entrar a la lista de espera (cola).", player.id);
         this.adapter.sendAnnouncement("» !nv | !bb     : Salir de la sala rapidamente", player.id);
         this.adapter.sendAnnouncement("» !reglas  : Normas básicas de convivencia.", player.id);
         this.adapter.sendAnnouncement("» !palabra : Te recuerda tu jugador (solo si jugás).", player.id);
