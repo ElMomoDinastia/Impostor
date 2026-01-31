@@ -194,14 +194,13 @@ case 'PLAYER_LEAVE': {
     case 'START_GAME': {
             const participants = state.queue.slice(0, 5);
             
-            // --- LÓGICA DE PROBABILIDAD (70/20/10) ---
             let mode = action.mode; // Si viene un modo forzado por comando, se respeta.
 
             if (!mode) {
                 const rand = Math.random() * 100;
-                if (rand < 10) {
+                if (rand < 3) {
                     mode = "TODO_IMPOSTOR";    // 10% Probabilidad
-                } else if (rand < 30) {
+                } else if (rand < 15) {
                     mode = "DOBLE_IMPOSTOR";  // 20% Probabilidad (30 - 10)
                 } else {
                     mode = "NORMAL";          // 70% Probabilidad
@@ -392,10 +391,49 @@ function handleEndVoting(state) {
     }
 
     const votedOutId = parseInt(sorted[0]); 
-    const isActuallyImpostor = round.impostorIds.includes(votedOutId);
     const votedPlayer = state.players.get(votedOutId);
     const votedName = (votedPlayer?.name || "Alguien").toUpperCase();
-    const isSpecialMode = round.mode === "DOBLE_IMPOSTOR" || round.mode === "TODO_IMPOSTOR";
+    const nextClueOrder = round.clueOrder.filter(id => id !== votedOutId);
+
+    // --- LÓGICA ESPECIAL: TODO IMPOSTOR ---
+    if (round.mode === "TODO_IMPOSTOR") {
+        // Si al eliminar a este quedan 2, revelamos la verdad
+        if (nextClueOrder.length <= 2) {
+            return {
+                state: { ...state, phase: types_1.GamePhase.REVEAL },
+                sideEffects: [
+                    { type: 'CLEAR_TIMER' },
+                    { type: 'MOVE_TO_SPECT', playerId: votedOutId },
+                    { type: 'ANNOUNCE_PUBLIC', message: BORDER },
+                    { type: 'ANNOUNCE_PUBLIC', message: `🤡 ¡${s('ꜱᴏʀᴘʀᴇꜱᴀ')}! ${s('ᴇʀᴀɴ ᴛᴏᴅᴏꜱ ɪᴍᴘᴏꜱᴛᴏʀᴇꜱ')}`, style: { color: 0xFF00FF, fontWeight: "bold" } },
+                    { type: 'ANNOUNCE_PUBLIC', message: `💀 ${s('ꜱᴇ ᴍᴀᴛᴀʀᴏɴ ᴇɴᴛʀᴇ ᴜꜱᴛᴇᴅᴇꜱ')}. ${s('ǫᴜᴇᴅᴀɴ')} ${nextClueOrder.length} ${s('ᴠɪᴠᴏꜱ')}.`, style: { color: 0xFFFFFF } },
+                    { type: 'ANNOUNCE_PUBLIC', message: BORDER },
+                    { type: 'UPDATE_STATS', payload: { winners: round.impostorIds, losers: [], winnerRole: 'IMPOSTOR' } },
+                    { type: 'SET_PHASE_TIMER', durationSeconds: 7, nextAction: 'RESET_GAME' }
+                ]
+            };
+        }
+
+        // Si quedan más de 2, seguimos el engaño diciendo que era inocente
+        const firstPlayerName = (state.players.get(nextClueOrder[0])?.name || "---").toUpperCase();
+        return {
+            state: { 
+                ...state, 
+                phase: types_1.GamePhase.CLUES, 
+                currentRound: { ...round, clueOrder: nextClueOrder, currentClueIndex: 0, clues: new Map(), votes: new Map() } 
+            },
+            sideEffects: [
+                { type: 'MOVE_TO_SPECT', playerId: votedOutId },
+                { type: 'ANNOUNCE_PUBLIC', message: `❌ ${votedName} ${s('ᴇʀᴀ ɪɴᴏᴄᴇɴᴛᴇ')}.`, style: { color: 0xFF4444, fontWeight: "bold" } },
+                { type: 'ANNOUNCE_PUBLIC', message: `📝 ${s('ɴᴜᴇᴠᴀ ʀᴏɴᴅᴀ ᴅᴇ ᴘɪꜱᴛᴀꜱ')}...`, style: { color: 0xFFFF00, fontWeight: "bold" } },
+                { type: 'ANNOUNCE_PUBLIC', message: `🔔 ${s('ᴛᴜʀɴᴏ ᴅᴇ')}: ${firstPlayerName}`, style: { color: 0x00FFCC, fontWeight: "bold" } },
+                { type: 'SET_PHASE_TIMER', durationSeconds: state.settings.clueTimeSeconds }
+            ]
+        };
+    }
+
+    // --- LÓGICA NORMAL Y DOBLE IMPOSTOR ---
+    const isActuallyImpostor = round.impostorIds.includes(votedOutId);
 
     if (isActuallyImpostor) {
         const remainingImpostors = round.impostorIds.filter(id => id !== votedOutId);
@@ -416,9 +454,7 @@ function handleEndVoting(state) {
             };
         } 
         
-        const nextClueOrder = round.clueOrder.filter(id => id !== votedOutId);
         const firstPlayerName = (state.players.get(nextClueOrder[0])?.name || "---").toUpperCase();
-
         return { 
             state: { 
                 ...state, 
@@ -437,7 +473,7 @@ function handleEndVoting(state) {
 
     const remainingInnocents = round.normalPlayerIds.filter(id => id !== votedOutId);
     
-    if (remainingInnocents.length <= 1 && round.mode !== "TODO_IMPOSTOR") {
+    if (remainingInnocents.length <= 1) {
         const impNames = round.impostorIds.map(id => state.players.get(id)?.name.toUpperCase()).join(" Y ");
         return { 
             state: { ...state, phase: types_1.GamePhase.REVEAL }, 
@@ -454,14 +490,12 @@ function handleEndVoting(state) {
         };
     }
 
-    const nextClueOrderNormal = round.clueOrder.filter(id => id !== votedOutId);
-    const firstPlayerNormal = (state.players.get(nextClueOrderNormal[0])?.name || "---").toUpperCase();
-
+    const firstPlayerNormal = (state.players.get(nextClueOrder[0])?.name || "---").toUpperCase();
     return { 
         state: { 
             ...state, 
             phase: types_1.GamePhase.CLUES, 
-            currentRound: { ...round, normalPlayerIds: remainingInnocents, clueOrder: nextClueOrderNormal, currentClueIndex: 0, clues: new Map(), votes: new Map() } 
+            currentRound: { ...round, normalPlayerIds: remainingInnocents, clueOrder: nextClueOrder, currentClueIndex: 0, clues: new Map(), votes: new Map() } 
         }, 
         sideEffects: [
             { type: 'MOVE_TO_SPECT', playerId: votedOutId },
