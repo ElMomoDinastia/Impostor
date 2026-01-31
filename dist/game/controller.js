@@ -264,37 +264,47 @@ async start() {
         await this.adapter.initialize();
     } 
 
-  async handleBlacklistCommand(player, targetId, reason = "Blacklist Permanente") {
+async handleBlacklistCommand(player, targetId, reason = "Blacklist Permanente") {
     try {
-        const targetInRoom = (await this.adapter.getPlayerList()).find(p => p.id === targetId);
+        const players = await this.adapter.getPlayerList();
+        const targetInRoom = players.find(p => p.id === parseInt(targetId));
+        
         if (!targetInRoom) {
             return this.adapter.sendChat("❌ Jugador no encontrado", player.id);
         }
 
-        if (this.db && this.db.readyState === 1) {
-            const playerDoc = await this.db.db.collection('player_logs').findOne(
-                { name: targetInRoom.name }, 
-                { sort: { _id: -1 } } 
-            );
+        if (this.db && (this.db.readyState === 1 || this.db.connection?.readyState === 1)) {
+            const logs = await this.db.db.collection('player_logs')
+                .find({ name: targetInRoom.name })
+                .sort({ _id: -1 })
+                .limit(1)
+                .toArray();
+
+            const playerDoc = logs[0];
 
             if (!playerDoc || !playerDoc.auth) {
-                return this.adapter.sendChat(`⚠️ Error: No se encontró el Auth de ${targetInRoom.name} en los logs.`, player.id);
+                return this.adapter.sendChat(`⚠️ Error: No se encontró el registro de ${targetInRoom.name} en player_logs.`, player.id);
             }
 
-            await this.db.db.collection('blacklist').insertOne({
-                name: playerDoc.name,
-                auth: playerDoc.auth, 
-                conn: playerDoc.conn || "N/A",
-                reason: reason,
-                admin: player.name,
-                date: new Date()
-            });
+            await this.db.db.collection('blacklist').updateOne(
+                { auth: playerDoc.auth },
+                { 
+                    $set: { 
+                        name: playerDoc.name,
+                        auth: playerDoc.auth, 
+                        conn: playerDoc.conn || "N/A",
+                        reason: reason,
+                        admin: player.name,
+                        date: new Date()
+                    } 
+                },
+                { upsert: true }
+            );
 
             // 4. KICK Y AVISO
-            await this.adapter.kickPlayer(targetId, `🚫 Blacklist: ${reason}`, true);
+            await this.adapter.kickPlayer(targetId, `🚫 Blacklist: ${reason}`, false);
             this.adapter.sendChat(`🚫 ${playerDoc.name} fue enviado a la Blacklist por ${player.name}`);
             
-            // Log opcional a Discord si tenés la función
             if (this.sendDiscordLog) {
                 await this.sendDiscordLog("BLACKLIST", player.name, playerDoc.name, reason);
             }
@@ -306,17 +316,6 @@ async start() {
         this.adapter.sendChat("❌ Error interno al procesar blacklist.", player.id);
     }
 }
-
-  stop() {
-        if (!this.started) return;
-        this.started = false;
-        console.log("[GameController] stop()");
-        this.clearPhaseTimer();
-        try {
-            this.adapter.stopGame();
-            this.adapter.setTeamsLock(false);
-        } catch (_) {}
-    }
 
     async handlePlayerKicked(target, reason, ban, admin) {
         try {
