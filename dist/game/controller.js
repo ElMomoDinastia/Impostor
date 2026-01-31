@@ -97,7 +97,8 @@ class GameController {
     this.adminCallCooldown = new Set();
 }
       /* ───────────── EVENTS ───────────── */   
-  setupEventHandlers() {
+  /* ───────────── EVENTS ───────────── */   
+setupEventHandlers() {
     this.adapter.setEventHandlers({
         onPlayerJoin: this.handlePlayerJoin.bind(this),
         onPlayerLeave: this.handlePlayerLeave.bind(this),
@@ -105,6 +106,8 @@ class GameController {
         onPlayerKicked: this.handlePlayerKicked.bind(this), 
 
         onRoomLink: () => {
+            this.adapter.setTeamColors(1, 60, 0x000000, [0xFF0000, 0x770000, 0x330000]);
+            
             setTimeout(() => {
                 announceBox(this.adapter, {
                     title: "Servidor configurado por Teleese",
