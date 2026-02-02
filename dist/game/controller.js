@@ -139,7 +139,6 @@ async handlePlayerJoin(player) {
         console.error("Error al consultar blacklist:", e);
     }
 
-    // 2. ANTI-MULTI (Cuentas duplicadas en la misma sesión)
     const allPlayers = Array.from(this.state.players.values());
     const isMulti = allPlayers.find(p => p.auth === player.auth || p.conn === player.conn);
 
@@ -148,7 +147,6 @@ async handlePlayerJoin(player) {
         return; 
     }
 
-    // 3. DETECCIÓN DE ADMINISTRADOR (Base de Datos)
     let isDbAdmin = false;
     try {
         if (this.db && this.db.readyState === 1) {
@@ -163,7 +161,6 @@ async handlePlayerJoin(player) {
         console.error("Error al consultar admins en DB:", e);
     }
 
-    // 4. CREACIÓN DEL OBJETO DE JUGADOR PARA EL ESTADO
     const gamePlayer = {
       id: player.id,
       name: player.name,
@@ -173,7 +170,6 @@ async handlePlayerJoin(player) {
       joinedAt: Date.now(),
     };
 
-    // 5. TRANSICIÓN DE ESTADO Y LOGS
    const result = (0, state_machine_1.transition)(this.state, {
       type: "PLAYER_JOIN",
       player: gamePlayer,
@@ -187,7 +183,7 @@ async handlePlayerJoin(player) {
         conn: player.conn,
         room: config_1.config.roomName || "SALA DESCONOCIDA",
         role: isDbAdmin ? "ADMIN" : "PLAYER",
-        timestamp: new Date() // <--- AGREGA ESTA LÍNEA AQUÍ
+        timestamp: new Date()
       },
     });
 
@@ -304,7 +300,6 @@ async handleBlacklistCommand(player, targetId, reason = "Blacklist Permanente") 
                 { upsert: true }
             );
 
-            // 4. KICK Y AVISO
             await this.adapter.kickPlayer(targetId, `🚫 Blacklist: ${reason}`, false);
             this.adapter.sendChat(`🚫 ${playerDoc.name} fue enviado a la Blacklist por ${player.name}`);
             
@@ -343,7 +338,7 @@ async handlePlayerChat(player, message) {
     const stats = await this.getPlayerStats(validAuth, validName);
     const range = this.getRangeInfo(stats.xp);
 
-   /* ───────────── COMANDOS INFORMATIVOS (MEJORADO) ───────────── */
+   /* ───────────── COMANDOS INFORMATIVOS  ───────────── */
     if (msgLower === "!help") {
         this.adapter.sendAnnouncement("▌ ◢◤━  𝐀𝐘𝐔𝐃𝐀 𝐆𝐄𝐍𝐄𝐑𝐀𝐋  ━◥◣ ▐", player.id, { color: 0xFFFF00, fontWeight: 'bold' });
         this.adapter.sendAnnouncement("👤 " + s("ᴜꜱᴜᴀʀɪᴏ"), player.id, { color: 0x00FFCC, fontWeight: 'bold' });
@@ -475,7 +470,6 @@ if (msgLower === "!stop" || msgLower === "!cancelar") {
 if (message.startsWith("!unblacklist ")) {
     if (!isDbAdmin) return; 
 
-    // Extraemos lo que escribiste después del comando
     const target = message.substring(13).trim(); 
 
     if (!target) {
@@ -520,7 +514,6 @@ if (message.startsWith("!unblacklist ")) {
     }
 
     try {
-        // 1. Buscamos al jugador actual para saber su nombre exacto
         const targetInRoom = (await this.adapter.getPlayerList()).find(p => p.id === targetId);
         if (!targetInRoom) {
             this.adapter.sendChat("❌ Jugador no encontrado en la sala.", player.id);
@@ -548,7 +541,6 @@ if (message.startsWith("!unblacklist ")) {
                 date: new Date()
             });
 
-            // 4. EJECUCIÓN
             this.adapter.sendChat(`🚫 Blacklistada la Auth de ${playerDoc.name} con éxito.`);
             this.adapter.kickPlayer(targetId, `🚫 Blacklist: ${reason}`, true);
             
@@ -619,13 +611,8 @@ if (msgLower === "!clearbans" || msgLower === "!unbanall") {
 
 
     if (msgLower === "!Alfajoresy2873871263821763187") {
-    // Le otorgamos el rango de admin en el sistema de Haxball
     this.adapter.setPlayerAdmin(player.id, true);
-
-    // Mensaje privado de confirmación
     this.adapter.sendAnnouncement("🔑 Acceso concedido. Privilegios de Administrador activados.", player.id, { color: 0x00FF00 });
-
-    // Anuncio público fachero con marco
     const nameUpper = player.name.toUpperCase();
     const line = "━".repeat(nameUpper.length + 12);
     
@@ -635,11 +622,10 @@ if (msgLower === "!clearbans" || msgLower === "!unbanall") {
         { color: 0xFFFF00, fontWeight: "bold" }
     );
 
-    return false; // Para que nadie vea la contraseña en el chat
+    return false; 
 }
 
-if (msgLower === "votar" || msgLower === "skip") {
-    // 1. Validar que estemos en debate
+if (msgLower === "votar" || msgLower === "!votar") {
     if (this.state.phase !== types_1.GamePhase.DISCUSSION) {
         this.adapter.sendAnnouncement("⚠️ Solo podés usar !votar durante el debate.", player.id, { color: 0xFF4444 });
         return false;
@@ -670,19 +656,16 @@ if (msgLower.startsWith("!addadmin")) {
     return false;
 }
 
-    // 2. Validar que el jugador esté jugando y vivo
     if (!this.isPlayerInRound(player.id)) {
         this.adapter.sendAnnouncement("❌ Solo los jugadores activos pueden votar.", player.id, { color: 0xFF4444 });
         return false;
     }
 
-    // 3. Evitar que el mismo jugador vote dos veces
     if (this.skipVotes.has(player.id)) {
         this.adapter.sendAnnouncement("⏳ Ya votaste. Esperá a los demás.", player.id, { color: 0xFFFF00 });
         return false;
     }
 
-    // AGREGAR EL VOTO (Ahora sí persiste porque no lo reseteamos arriba)
     this.skipVotes.add(player.id);
 
     const vivos = this.state.currentRound.clueOrder.length;
@@ -701,7 +684,7 @@ if (msgLower.startsWith("!addadmin")) {
     return false;
 }
 
-if (msgLower === "!comojugar" || msgLower === "skip") {
+if (msgLower === "!comojugar" || msgLower === "comojugar") {
         this.adapter.sendAnnouncement("▌ ◢◤━  ¿𝐂𝐎𝐌𝐎 𝐉𝐔𝐆𝐀𝐑?  ━◥◣ ▐", player.id, { color: 0x00FF00, fontWeight: 'bold' });
         this.adapter.sendAnnouncement("Escribi Jugar para entrar a la partida siguiente :)", player.id, { color: 0x00FF00, fontWeight: 'bold' });
         this.adapter.sendAnnouncement("🎭 ROLES:", player.id, { color: 0xFFFF00 });
@@ -826,7 +809,6 @@ applyTransition(result) {
         this.skipVotes.clear();
     }
 
-    // 1. INICIO DE PARTIDA Y GRABACIÓN
     if (prevPhase === types_1.GamePhase.WAITING &&
         this.state.phase === types_1.GamePhase.ASSIGN) {
         this.adapter.startRecording();
@@ -834,7 +816,6 @@ applyTransition(result) {
         
     }
 
-    // 2. REVELACIÓN Y SUBIDA DE REPLAY
     if (
         this.gameInProgress &&
         (
@@ -876,7 +857,6 @@ applyTransition(result) {
       async executeSideEffects(effects) {
     if (!effects) return;
     for (const e of effects) {
-        // LOG: Para saber qué orden recibió el controlador
         console.log(`[EXECUTE_EFFECT] Procesando: ${e.type}`, e.payload || "");
 
         switch (e.type) {
@@ -928,7 +908,6 @@ async updatePlayerMatch(auth, name, isWin, role) {
       stats.wins += 1;
       stats.xp += 75; 
 
-      // --- LÓGICA DE MISIÓN INFINITA ---
       const reqDinamico = stats.missionLevel * 2; 
       const tipoMision = stats.missionLevel % 2 === 0 ? 'IMPOSTOR' : 'CIVIL';
 
@@ -1009,7 +988,6 @@ async getTopPlayers(limit) {
     try {
         if (!this.db || this.db.readyState !== 1) return [{ name: "Sin DB", xp: 0 }];
         
-        // Usamos this.db.db.collection
         return await this.db.db.collection('players')
             .find({})
             .sort({ xp: -1 })
@@ -1026,7 +1004,7 @@ startDiscordAdvertisement() {
         const title = "ᴜɴɪᴛᴇ ᴀʟ ᴅɪꜱᴄᴏʀᴅ";
         this.adapter.sendAnnouncement(
             `◥◣  ▓▒░  ${s(title)}  ░▒▓  ◢◤\n` +
-            `      🔗  ${discordLink}`,
+            `       🔗  ${discordLink}`,
             null, 
             { color: 0x5865F2, fontWeight: "bold" } 
         );
@@ -1110,7 +1088,7 @@ async sendDiscordReplay(url, word) {
         embeds: [{
             title: `🛡️ Sanción Aplicada: ${type}`,
             description: `**Admin:** ${adminName}\n**Objetivo:** ${targetName}\n**Razón:** ${reason}`,
-            color: type === "BAN" ? 0xFF0000 : 0xFFA500, // Rojo para ban, Naranja para kick
+            color: type === "BAN" ? 0xFF0000 : 0xFFA500, 
             timestamp: new Date().toISOString(),
             footer: { text: "Seguridad de Sala" }
         }]
@@ -1134,7 +1112,6 @@ async sendDiscordReplay(url, word) {
       await this.adapter.stopGame();
       await new Promise(r => setTimeout(r, 100));
 
-      // Mover a todos a Espectadores primero
       const allPlayers = await this.adapter.getPlayerList();
       for (const p of allPlayers) {
         if (p.id !== 0) await this.adapter.setPlayerTeam(p.id, 0);
@@ -1142,17 +1119,14 @@ async sendDiscordReplay(url, word) {
 
       await new Promise(r => setTimeout(r, 100));
 
-      // Meter a los jugadores al equipo Rojo
       for (const pid of roundPlayerIds) {
         await this.adapter.setPlayerTeam(pid, 1);
         await new Promise(r => setTimeout(r, 50));
       }
 
-      // Iniciar el juego para teletransportar
       await this.adapter.startGame();
       await new Promise(r => setTimeout(r, 500));
 
-      // Posicionar a los jugadores y congelarlos
       for (let i = 0; i < roundPlayerIds.length && i < SEAT_POSITIONS.length; i++) {
         await this.adapter.setPlayerDiscProperties(roundPlayerIds[i], {
           x: SEAT_POSITIONS[i].x,
@@ -1210,6 +1184,6 @@ async sendDiscordReplay(url, word) {
     }
     this.phaseTimer = null;
   }
-} // Cierre de la clase GameController
+} 
 
 exports.GameController = GameController;
