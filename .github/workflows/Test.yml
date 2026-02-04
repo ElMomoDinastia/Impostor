@@ -33,7 +33,7 @@ jobs:
         env:
           ROOM_NUMBER: ${{ matrix.room_id }}
           IS_HEADER: ${{ matrix.room_id == 0 }}
-          IS_FOOTER: ${{ matrix.room_id == 7 }}
+          IS_FOOTER: ${{ matrix.room_id == 5 }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
